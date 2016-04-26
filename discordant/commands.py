@@ -3,20 +3,58 @@ import asyncio
 import re
 import requests
 
+_stats = {}
 
-@Discordant.register_handler(r'^ping$', re.I)
-async def _ping(self, match, message):
-    await self.send_message(message.channel,
-                            message.content.replace('i', 'o')
-                                           .replace('I', 'O'))
+
+@Discordant.register_handler(r'.*', re.I)
+async def _record_stats(self, match, message):
+    if not message.server.id == self.config.get("Servers", "japanese"):
+        return
+    global _stats
+    if message.author.id not in _stats:
+        _stats[message.author.id] = dict(user_id=message.author.id,
+                                         message_count=0,
+                                         word_count=0,
+                                         word_frequency={})
+    user_stat = _stats[message.author.id]
+    user_stat['message_count'] += 1
+    user_stat['word_count'] += len(message.content.split())
 
 
 @Discordant.register_handler(r'\bayy+$', re.I)
 async def _ayy_lmao(self, match, message):
-    await self.send_message(message.channel, 'lmao')
+    if is_controller(self, message.author):
+        await self.send_message(message.channel, 'lmao')
 
 
-@Discordant.register_command('youtube')
+def is_controller(self, user):
+    return user.id in self.config['Controllers'].values()
+
+
+def get_user_by_id(self, user_id):
+    l = [m for s in self.servers for m in s.members if m.id == user_id]
+    return l[0] if l else None
+
+
+@Discordant.register_command('stats')
+async def _stats_command(self, args, message):
+    if not is_controller(self, message.author):
+        self.send_message(message.channel, 'nope.avi')
+        return
+    if args == 'messages':
+        output = ''
+        counter = 0
+        for user_id in sorted(_stats, key=lambda x: _stats[x]['message_count'],
+                              reverse=True):
+            output += \
+                '{}. {}: {}\n'.format(counter,
+                                      get_user_by_id(self, user_id).name,
+                                      _stats[user_id]['message_count'])
+            counter += 1
+        await self.send_message(message.channel, output)
+
+
+# @Discordant.register_command('youtube')
 async def _youtube_search(self, args, message):
     base_req_url = 'https://www.googleapis.com/youtube/v3/search'
     req_args = {
@@ -41,7 +79,7 @@ async def _youtube_search(self, args, message):
                                 json['items'][0]['id']['videoId'])
 
 
-@Discordant.register_command('urban')
+# @Discordant.register_command('urban')
 async def _urban_dictionary_search(self, args, message):
     # this entire function is an egregious violation of the DRY
     # principle, so TODO: abstract out the request part of these functions
@@ -108,7 +146,7 @@ async def _recall(self, args, message):
     await self.send_message(message.channel, _memos[args])
 
 
-@Discordant.register_command('sleep')
+# @Discordant.register_command('sleep')
 async def _sleep(self, args, message):
     await asyncio.sleep(5)
     await self.send_message(message.channel, 'done sleeping')
