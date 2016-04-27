@@ -3,28 +3,41 @@ import asyncio
 import re
 import requests
 
-_stats = {}
-
-
-@Discordant.register_handler(r'.*', re.I)
-async def _record_stats(self, match, message):
-    if not message.server.id == self.config.get("Servers", "japanese"):
-        return
-    global _stats
-    if message.author.id not in _stats:
-        _stats[message.author.id] = dict(user_id=message.author.id,
-                                         message_count=0,
-                                         word_count=0,
-                                         word_frequency={})
-    user_stat = _stats[message.author.id]
-    user_stat['message_count'] += 1
-    user_stat['word_count'] += len(message.content.split())
-
 
 @Discordant.register_handler(r'\bayy+$', re.I)
 async def _ayy_lmao(self, match, message):
     if is_controller(self, message.author):
         await self.send_message(message.channel, 'lmao')
+
+_stats = {}
+# {str (server_id):
+#     {str (user_id):
+#         {message_count:int,
+#          word_count:int,
+#          word_frequency: {str (word):int}
+#         }
+#     }
+# }
+
+
+@Discordant.register_handler(r'.*', re.I)
+async def _record_stats(self, match, message):
+    if message.server.id not in self.config["Servers"].values():
+        return
+    global _stats
+    if message.server.id not in _stats:
+        _stats[message.server.id] = {}
+    if message.author.id not in _stats[message.server.id]:
+        _stats[message.server.id][message.author.id] = dict(message_count=0,
+                                                            word_count=0,
+                                                            word_frequency={})
+    user_stat = _stats[message.server.id][message.author.id]
+    user_stat['message_count'] += 1
+    # regex for japanese, halfwidth katakana, cjk unified
+    p = re.compile(r'[\u3040-\u30ff\uff65-\uff9f\u4e00-\u9fcc]|\w+')
+    for word in re.findall(p, message.content):
+        user_stat['word_count'] += 1
+        user_stat['word_frequency'][word.lower()] += 1
 
 
 def is_controller(self, user):
@@ -36,22 +49,39 @@ def get_user_by_id(self, user_id):
     return l[0] if l else None
 
 
+def get_server_by_id(self, server_id):
+    l = [s for s in self.servers if s.id == server_id]
+    return l[0] if l else None
+
+
 @Discordant.register_command('stats')
 async def _stats_command(self, args, message):
     if not is_controller(self, message.author):
-        self.send_message(message.channel, 'nope.avi')
         return
-    if args == 'messages':
+    global _stats
+    if args == 'messages' or args == 'wordcount':
         output = ''
         counter = 0
-        for user_id in sorted(_stats, key=lambda x: _stats[x]['message_count'],
+        server_stat = _stats[message.server.id]
+
+        def which():
+            global args
+            return 'message_count' if args == 'messages' else 'word_count'
+        for user_id in sorted(server_stat,
+                              key=lambda x: server_stat[x][which()],
                               reverse=True):
-            output += \
-                '{}. {}: {}\n'.format(counter,
-                                      get_user_by_id(self, user_id).name,
-                                      _stats[user_id]['message_count'])
+            user_name = get_user_by_id(self, user_id).name
+            user_stat = server_stat[user_id][which()]
+            output += '{}. {}: {}\n'.format(counter, user_name, user_stat)
             counter += 1
         await self.send_message(message.channel, output)
+    elif args == 'wordfreq':  # TODO
+        pass
+    elif args == 'clear':
+        _stats = {}
+    else:
+        await self.send_message(self.config.get('Commands', 'command_char') +
+                                'stats <messages/wordcount/clear>')
 
 
 # @Discordant.register_command('youtube')
