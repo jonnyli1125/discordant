@@ -22,7 +22,7 @@ _stats = {}
 
 @Discordant.register_handler(r'.*', re.I)
 async def _record_stats(self, match, message):
-    if message.server.id not in self.config["Servers"].values():
+    if message.server.id not in self.config["Servers"].values() or message.author.id == self.user.id:
         return
     global _stats
     if message.server.id not in _stats:
