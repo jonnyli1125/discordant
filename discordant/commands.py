@@ -33,12 +33,17 @@ async def _record_stats(self, match, message):
                                                             word_frequency={})
     user_stat = _stats[message.server.id][message.author.id]
     user_stat['message_count'] += 1
-    # regex for japanese, halfwidth katakana, cjk unified
-    p = re.compile(r'[\u3040-\u30ff\uff65-\uff9f\u4e00-\u9fcc]|\w+')
+    # regex for urls, japanese, halfwidth katakana, cjk unified
+    # how to make it NOT match urls?
+    p = re.compile(r'[(https?://\S+)|\u3040-\u30ff\uff65-\uff9f\u4e00-\u9fcc]|\w+')
     m = re.findall(p, message.content)
     user_stat['word_count'] += len(m)
     for word in m:
-        user_stat['word_frequency'][word.lower()] += 1
+        word_freq = user_stat['word_frequency']
+        word = word.lower()
+        if word not in word_freq:
+            word_freq[word] = 0
+        word_freq[word] += 1
 
 
 def is_controller(self, user):
@@ -48,6 +53,11 @@ def is_controller(self, user):
 def get_user_by_id(self, user_id):
     l = [m for s in self.servers for m in s.members if m.id == user_id]
     return l[0] if l else None
+
+
+def search_user_by_name(self, search):
+    l = [m for s in self.servers for m in s.members if search in m.name]
+    return l[0] if l else get_user_by_id(self, search)
 
 
 def get_server_by_id(self, server_id):
@@ -60,29 +70,48 @@ async def _stats_command(self, args, message):
     if not is_controller(self, message.author):
         return
     global _stats
+    server_stat = _stats[message.server.id]
     if args == 'messages' or args == 'wordcount':
         output = ''
         counter = 0
-        server_stat = _stats[message.server.id]
 
-        def which():
-            global args
-            return 'message_count' if args == 'messages' else 'word_count'
+        def which(s):
+            return 'message_count' if s == 'messages' else 'word_count'
         for user_id in sorted(server_stat,
-                              key=lambda x: server_stat[x][which()],
+                              key=lambda x: server_stat[x][which(args)],
                               reverse=True):
             user_name = get_user_by_id(self, user_id).name
-            user_stat = server_stat[user_id][which()]
+            user_stat = server_stat[user_id][which(args)]
             output += '{}. {}: {}\n'.format(counter, user_name, user_stat)
             counter += 1
         await self.send_message(message.channel, output)
-    elif args == 'wordfreq':  # TODO
-        pass
+    elif args.startswith('wordfreq '):
+        search = args[9:]
+        user = search_user_by_name(self, search)
+        if user is None:
+            self.send_message(message.channel, "user not found")
+            return
+        output = ''
+        word_frequency = server_stat[user.id]['word_frequency']
+        for word in sorted(word_frequency, key=word_frequency.get, reverse=True):
+            output += "{} ({}), ".format(word, word_frequency[word])
+        await self.send_message(message.channel, output[:-2])
     elif args == 'clear':
         _stats = {}
     else:
         await self.send_message(self.config.get('Commands', 'command_char') +
-                                'stats <messages/wordcount/clear>')
+                                'stats <messages/wordcount/(wordfreq <name>)/clear>')
+
+
+@Discordant.register_command('id')
+async def _user_id_command(self, args, message):
+    user = search_user_by_name(self, args)
+    await self.send_message(message.channel, "user not found" if user is None else user.id)
+
+
+@Discordant.register_command('sid')
+async def _server_id_command(self, args, message):
+    await self.send_message(message.channel, '\n'.join(["{} {}".format(x.name, x.id) for x in self.servers]))
 
 
 # @Discordant.register_command('youtube')
