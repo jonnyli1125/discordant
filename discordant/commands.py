@@ -35,8 +35,9 @@ async def _record_stats(self, match, message):
     user_stat['message_count'] += 1
     # regex for japanese, halfwidth katakana, cjk unified
     p = re.compile(r'[\u3040-\u30ff\uff65-\uff9f\u4e00-\u9fcc]|\w+')
-    for word in re.findall(p, message.content):
-        user_stat['word_count'] += 1
+    m = re.findall(p, message.content)
+    user_stat['word_count'] += len(m)
+    for word in m:
         user_stat['word_frequency'][word.lower()] += 1
 
 
