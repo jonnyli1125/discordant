@@ -33,14 +33,16 @@ async def _record_stats(self, match, message):
                                                             word_frequency={})
     user_stat = _stats[message.server.id][message.author.id]
     user_stat['message_count'] += 1
-    # regex for urls, japanese, halfwidth katakana, cjk unified
+    # regex for urls, japanese, halfwidth katakana, cjk unified, words
     # how to make it NOT match urls?
-    p = re.compile(r'[(https?://\S+)|\u3040-\u30ff\uff65-\uff9f\u4e00-\u9fcc]|\w+')
+    p = re.compile(r'(https?://\S+)|([\u3040-\u30ff\uff65-\uff9f\u4e00-\u9fcc]|\w+)')
     m = re.findall(p, message.content)
     user_stat['word_count'] += len(m)
-    for word in m:
+    for g1, g2 in m:
+        def which(a, b):
+            return a if a else b
         word_freq = user_stat['word_frequency']
-        word = word.lower()
+        word = which(g1, g2).lower()
         if word not in word_freq:
             word_freq[word] = 0
         word_freq[word] += 1
@@ -56,7 +58,7 @@ def get_user_by_id(self, user_id):
 
 
 def search_user_by_name(self, search):
-    l = [m for s in self.servers for m in s.members if search in m.name]
+    l = [m for s in self.servers for m in s.members if search.lower() in m.name.lower()]
     return l[0] if l else get_user_by_id(self, search)
 
 
@@ -70,6 +72,12 @@ async def _stats_command(self, args, message):
     if not is_controller(self, message.author):
         return
     global _stats
+    if message.server.id not in self.config["Servers"].values():
+        await self.send_message(message.channel, "not recording stats for this server")
+        return
+    if message.server.id not in _stats:
+        await self.send_message(message.channel, "no data yet")
+        return
     server_stat = _stats[message.server.id]
     if args == 'messages' or args == 'wordcount':
         output = ''
@@ -89,7 +97,7 @@ async def _stats_command(self, args, message):
         search = args[9:]
         user = search_user_by_name(self, search)
         if user is None:
-            self.send_message(message.channel, "user not found")
+            await self.send_message(message.channel, "user not found")
             return
         output = ''
         word_frequency = server_stat[user.id]['word_frequency']
@@ -210,3 +218,9 @@ async def _recall(self, args, message):
 async def _sleep(self, args, message):
     await asyncio.sleep(5)
     await self.send_message(message.channel, 'done sleeping')
+
+
+@Discordant.register_command('exit')
+async def _exit(self, args, message):
+        import sys
+        sys.exit()
