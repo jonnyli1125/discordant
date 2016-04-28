@@ -222,5 +222,6 @@ async def _sleep(self, args, message):
 
 @Discordant.register_command('exit')
 async def _exit(self, args, message):
+    if is_controller(self, message.author):
         import sys
         sys.exit()
