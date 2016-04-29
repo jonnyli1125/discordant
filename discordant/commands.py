@@ -22,7 +22,7 @@ _stats = {}
 
 @Discordant.register_handler(r'.*', re.I)
 async def _record_stats(self, match, message):
-    if message.server.id not in self.config["Servers"].values() or message.author.id == self.user.id:
+    if message.server.id not in self.config["Servers"].values() or message.author == self.user:
         return
     global _stats
     if message.server.id not in _stats:
@@ -39,13 +39,9 @@ async def _record_stats(self, match, message):
     m = re.findall(p, message.content)
     user_stat['word_count'] += len(m)
     for g1, g2 in m:
-        def which(a, b):
-            return a if a else b
         word_freq = user_stat['word_frequency']
-        word = which(g1, g2).lower()
-        if word not in word_freq:
-            word_freq[word] = 0
-        word_freq[word] += 1
+        word = (g1 if g1 else g2).lower()
+        word_freq[word] = 1 + (word_freq[word] if word in word_freq else 0)
 
 
 def is_controller(self, user):
