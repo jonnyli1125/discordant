@@ -23,6 +23,7 @@ class Discordant(discord.Client):
 
         self.__email = ''  # prevent a conflict with discord.Client#email
         self._password = ''
+        self._token = ''
         self.command_char = ''
         self.game_name = ''
         self.config = ConfigParser()
@@ -30,7 +31,10 @@ class Discordant(discord.Client):
         self.load_config(config_file)
 
     def run(self):
-        super().run(self.__email, self._password)
+        if self._token:
+            super().run(self._token)
+        else:
+            super().run(self.__email, self._password)
 
     def load_config(self, config_file):
         if re.match(r'^https?:\/\/.*', config_file):
@@ -42,8 +46,11 @@ class Discordant(discord.Client):
             sys.exit(-1)
         else:
             self.config.read(config_file)
-        self.__email = self.config['Login']['email']
-        self._password = self.config['Login']['password']
+        if 'token' in self.config['Login']:
+            self._token = self.config['Login']['token']
+        else:
+            self.__email = self.config['Login']['email']
+            self._password = self.config['Login']['password']
         self.command_char = self.config['Commands']['command_char']
         self.game_name = self.config['Client']['game']
         self.load_aliases()
@@ -59,8 +66,7 @@ class Discordant(discord.Client):
                 self._commands[cmd_name].aliases.append(alias)
 
     async def on_ready(self):
-        game = discord.Game(
-            name=self.game_name) if not empty(self.game_name) else None
+        game = discord.Game(name=self.game_name) if self.game_name else None
         await self.change_status(game=game)
 
     async def on_message(self, message):
