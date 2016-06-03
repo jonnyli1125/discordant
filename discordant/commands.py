@@ -14,7 +14,7 @@ async def _ayy_lmao(self, match, message):
 async def _youtube_search(self, args, message):
     base_req_url = 'https://www.googleapis.com/youtube/v3/search'
     req_args = {
-        'key': self.config.get('API-Keys', 'youtube'),
+        'key': self.config['API-Keys']['youtube'],
         'part': 'snippet',
         'type': 'video',
         'maxResults': 1,

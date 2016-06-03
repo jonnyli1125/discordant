@@ -5,6 +5,7 @@ from inspect import iscoroutinefunction
 from os import path
 import sys
 import re
+import requests
 
 
 Command = namedtuple('Command', ['name', 'arg_func', 'aliases'])
@@ -23,6 +24,7 @@ class Discordant(discord.Client):
         self.__email = ''  # prevent a conflict with discord.Client#email
         self._password = ''
         self.command_char = ''
+        self.game_name = ''
         self.config = ConfigParser()
 
         self.load_config(config_file)
@@ -31,16 +33,19 @@ class Discordant(discord.Client):
         super().run(self.__email, self._password)
 
     def load_config(self, config_file):
-        if not path.exists(config_file):
+        if re.match(r'^https?:\/\/.*', config_file) is not None:
+            self.config = requests.get(config_file).json()
+        elif not path.exists(config_file):
             print("No config file found (expected '{}').".format(config_file))
             print("Copy config-example.ini to", config_file,
                   "and edit it to use the appropriate settings.")
             sys.exit(-1)
-
-        self.config.read(config_file)
-        self.__email = self.config.get('Login', 'email')
-        self._password = self.config.get('Login', 'password')
-        self.command_char = self.config.get('Commands', 'command_char')
+        else:
+            self.config.read(config_file)
+        self.__email = self.config['Login']['email']
+        self._password = self.config['Login']['password']
+        self.command_char = self.config['Commands']['command_char']
+        self.game_name = self.config['Client']['game']
         self.load_aliases()
 
     def load_aliases(self):
@@ -54,8 +59,7 @@ class Discordant(discord.Client):
                 self._commands[cmd_name].aliases.append(alias)
 
     async def on_ready(self):
-        game_name = self.config.get("Client", "game")
-        await self.change_status(game=discord.Game(name=game_name))
+        await self.change_status(game=discord.Game(name=self.game_name))
 
     async def on_message(self, message):
         # TODO: logging
