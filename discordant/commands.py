@@ -2,12 +2,12 @@ from .discordant import Discordant
 import asyncio
 import re
 import requests
+from .utils import *
 
 
 # @Discordant.register_handler(r'\bayy+$', re.I)
 async def _ayy_lmao(self, match, message):
-    if is_controller(self, message.author):
-        await self.send_message(message.channel, 'lmao')
+    await self.send_message(message.channel, 'lmao')
 
 
 # @Discordant.register_command('youtube')
@@ -108,8 +108,24 @@ async def _sleep(self, args, message):
     await self.send_message(message.channel, 'done sleeping')
 
 
-@Discordant.register_command('exit')
+# @Discordant.register_command('exit')
 async def _exit(self, args, message):
-    if is_controller(self, message.author):
-        import sys
-        sys.exit()
+    import sys
+    sys.exit()
+
+@Discordant.register_command("timezone")
+async def _convert_timezone(self, args, message):
+    try:
+        split = args.split()
+        dt = read_time(split[0])
+        tz_from = get_timezone_by_code(split[1], dt)
+        tz_to = get_timezone_by_code(split[2], dt)
+        new_dt = convert_timezone(dt, tz_from, tz_to)
+        await self.send_message(message.channel, "{} is {}, {}".format(
+            tz_from.localize(dt).strftime("%I:%M %p %Z"),
+            new_dt.strftime("%I:%M %p %Z"),
+            relative_date_str(dt, new_dt))
+                                )
+    except ValueError as e:
+        await self.send_message(message.channel,
+                                "timezone conversion failed: " + str(e))
