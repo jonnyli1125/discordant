@@ -53,6 +53,9 @@ class Discordant(discord.Client):
                 self._aliases[alias] = cmd_name
                 self._commands[cmd_name].aliases.append(alias)
 
+    async def on_ready(self):
+        self.change_status(game=self.config.get("Client", "game"))
+
     async def on_message(self, message):
         # TODO: logging
         if message.content.startswith(self.command_char):
