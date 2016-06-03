@@ -33,7 +33,7 @@ class Discordant(discord.Client):
         super().run(self.__email, self._password)
 
     def load_config(self, config_file):
-        if re.match(r'^https?:\/\/.*', config_file) is not None:
+        if re.match(r'^https?:\/\/.*', config_file):
             self.config = requests.get(config_file).json()
         elif not path.exists(config_file):
             print("No config file found (expected '{}').".format(config_file))
@@ -59,7 +59,9 @@ class Discordant(discord.Client):
                 self._commands[cmd_name].aliases.append(alias)
 
     async def on_ready(self):
-        await self.change_status(game=discord.Game(name=self.game_name))
+        game = discord.Game(
+            name=self.game_name) if not empty(self.game_name) else None
+        await self.change_status(game=game)
 
     async def on_message(self, message):
         # TODO: logging
