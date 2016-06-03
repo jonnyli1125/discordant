@@ -54,7 +54,8 @@ class Discordant(discord.Client):
                 self._commands[cmd_name].aliases.append(alias)
 
     async def on_ready(self):
-        self.change_status(game=self.config.get("Client", "game"))
+        game_name = self.config.get("Client", "game")
+        await self.change_status(game=discord.Game(name=game_name))
 
     async def on_message(self, message):
         # TODO: logging
