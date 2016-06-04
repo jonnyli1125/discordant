@@ -62,7 +62,9 @@ class Discordant(discord.Client):
         elif path.isfile(avatar_path):
             self.avatar = open(avatar_path, "rb").read()
         else:
-            self.avatar = None
+            print("Avatar could not be found.")
+            print("Please enter a valid file path or URL.")
+            sys.exit(-1)
         self.load_aliases()
 
     def load_aliases(self):
