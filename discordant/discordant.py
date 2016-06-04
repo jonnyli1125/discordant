@@ -71,7 +71,8 @@ class Discordant(discord.Client):
 
     async def on_message(self, message):
         # TODO: logging
-        if message.content.startswith(self.command_char):
+        if message.content.startswith(self.command_char) and \
+                        message.author != self.user:
             await self.run_command(message)
             return
 

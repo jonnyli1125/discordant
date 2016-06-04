@@ -70,7 +70,7 @@ async def _urban_dictionary_search(self, args, message):
 _memos = {}
 
 
-@Discordant.register_command('remember')
+# @Discordant.register_command('remember')
 async def _remember(self, args, message):
     global _memos
 
@@ -91,7 +91,7 @@ async def _remember(self, args, message):
         "Remembered message '{}' for key '{}'.".format(memo, key))
 
 
-@Discordant.register_command('recall')
+# @Discordant.register_command('recall')
 async def _recall(self, args, message):
     global _memos
     if args not in _memos:
@@ -118,6 +118,9 @@ async def _exit(self, args, message):
 async def _convert_timezone(self, args, message):
     try:
         split = args.split()
+        if len(split) != 3:
+            await self.send_message(
+                message.channel, "!timezone <time> <from> <to>")
         dt = read_time(split[0])
         tz_from = get_timezone_by_code(split[1], dt)
         tz_to = get_timezone_by_code(split[2], dt)
@@ -129,4 +132,63 @@ async def _convert_timezone(self, args, message):
                                 )
     except ValueError as e:
         await self.send_message(message.channel,
-                                "timezone conversion failed: " + str(e))
+                                "Timezone conversion failed: " + str(e))
+
+
+@Discordant.register_command("jisho")
+async def _jisho_search(self, args, message):
+    if not args:
+        await self.send_message(message.channel, "!jisho [limit] <query>")
+        return
+    limit = 1
+    query = args
+    result = re.match(r"^([0-9]+)\s+(.*)$", args)
+    if result:
+        limit, query = [result.group(x) for x in (1, 2)]
+
+    base_req_url = "http://jisho.org/api/v1/search/words"
+    res = requests.get(base_req_url, {"keyword": query})
+    if not res.ok:
+        await self.send_message(message.channel, 'Error: ',
+                                res.status_code, '-', res.reason)
+        return
+
+    results = res.json()["data"][:int(limit)]
+    if not results:
+        await self.send_message(message.channel, "No results found.")
+        return
+    output = ""
+    for result in results:
+        japanese = result["japanese"]
+        output += ("**{}**" + (" {}" if len(japanese[0]) > 1 else "")).format(
+            *japanese[0].values()) + "\n"
+        new_line = ""
+        if result["is_common"]:
+            new_line += "Common word. "
+        if result["tags"]:  # it doesn't show jlpt tags, only wk tags?
+            new_line += "Wanikani level " + ", ".join(
+                [tag[8:] for tag in result["tags"]]) + ". "
+        if new_line:
+            output += new_line + "\n"
+        senses = result["senses"]
+        for index, sense in enumerate(senses):
+            parts = sense["parts_of_speech"]
+            if parts == ["Wikipedia definition"]:
+                continue
+            if parts:
+                output += "*" + ", ".join(parts) + "*\n"
+            output += str(index + 1) + ". " + "; ".join(
+                sense["english_definitions"])
+            for attr in ["tags", "see_also", "info"]:
+                if sense[attr]:
+                    output += ". *" + "*. *".join(sense[attr]) + "*"
+            output += "\n"
+        if len(japanese) > 1:
+            def f(x):
+                return ("{}" + (" ({})" if len(x) > 1 else "")).format(
+                    *x.values())
+            output += "Other forms: " + ", ".join(
+                [f(x) for x in japanese[1:]]) + "\n"
+        output += "\n"
+    for msg in split_every(output.strip(), 2000):
+        await self.send_message(message.channel, msg)

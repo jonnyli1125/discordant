@@ -35,3 +35,7 @@ def relative_date_str(dt_1, dt_2):
         return "{} day{} {}".format(abs(delta),
                                     "s" if abs(delta) != 1 else "",
                                     "ahead" if delta > 0 else "behind")
+
+
+def split_every(s, n):
+    return [s[i:i + n] for i in range(0, len(s), n)]
