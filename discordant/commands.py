@@ -176,7 +176,8 @@ async def _jisho_search(self, args, message):
             output += new_line + "\n"
         senses = result["senses"]
         for index, sense in enumerate(senses):
-            parts = sense["parts_of_speech"]
+            # jisho returns null sometimes for some parts of speech... k den
+            parts = [x for x in sense["parts_of_speech"] if x is not None]
             if parts == ["Wikipedia definition"]:
                 continue
             if parts:
