@@ -1,6 +1,7 @@
 from datetime import datetime
 from pytz import timezone
 import pytz
+import re
 
 
 def get_timezone_by_code(code, date):
@@ -39,3 +40,7 @@ def relative_date_str(dt_1, dt_2):
 
 def split_every(s, n):
     return [s[i:i + n] for i in range(0, len(s), n)]
+
+
+def is_url(s):  # good enough for now lmao
+    return re.match(r'^https?:\/\/.*', s)

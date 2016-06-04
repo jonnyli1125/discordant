@@ -4,8 +4,8 @@ from configparser import ConfigParser
 from inspect import iscoroutinefunction
 from os import path
 import sys
-import re
 import requests
+from discordant.utils import *
 
 
 Command = namedtuple('Command', ['name', 'arg_func', 'aliases'])
@@ -25,7 +25,8 @@ class Discordant(discord.Client):
         self._password = ''
         self._token = ''
         self.command_char = ''
-        self.game_name = ''
+        self.game = None
+        self.avatar = None
         self.config = ConfigParser()
 
         self.load_config(config_file)
@@ -37,7 +38,7 @@ class Discordant(discord.Client):
             super().run(self.__email, self._password)
 
     def load_config(self, config_file):
-        if re.match(r'^https?:\/\/.*', config_file):
+        if is_url(config_file):
             self.config = requests.get(config_file).json()
         elif not path.exists(config_file):
             print("No config file found (expected '{}').".format(config_file))
@@ -52,7 +53,16 @@ class Discordant(discord.Client):
             self.__email = self.config['Login']['email']
             self._password = self.config['Login']['password']
         self.command_char = self.config['Commands']['command_char']
-        self.game_name = self.config['Client']['game']
+        game_name = self.config["Client"]["game"]
+        if game_name:
+            self.game = discord.Game(name=game_name)
+        avatar_path = self.config["Client"]["avatar"]
+        if is_url(avatar_path):
+            self.avatar = requests.get(avatar_path, stream=True).raw.read()
+        elif path.isfile(avatar_path):
+            self.avatar = open(avatar_path, "rb").read()
+        else:
+            self.avatar = None
         self.load_aliases()
 
     def load_aliases(self):
@@ -66,8 +76,8 @@ class Discordant(discord.Client):
                 self._commands[cmd_name].aliases.append(alias)
 
     async def on_ready(self):
-        game = discord.Game(name=self.game_name) if self.game_name else None
-        await self.change_status(game=game)
+        await self.change_status(game=self.game)
+        await self.edit_profile(self._password, avatar=self.avatar)
 
     async def on_message(self, message):
         # TODO: logging

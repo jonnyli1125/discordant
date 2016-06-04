@@ -115,6 +115,12 @@ async def _exit(self, args, message):
     sys.exit()
 
 
+@Discordant.register_command("help")
+async def _help(self, args, message):
+    await self.send_message(message.channel, "Commands: " + ", ".join(
+        [self._commands[x].aliases[0] for x in self._commands]))
+
+
 @Discordant.register_command("timezone")
 async def _convert_timezone(self, args, message):
     try:
@@ -162,10 +168,14 @@ async def _jisho_search(self, args, message):
         await self.send_message(message.channel, "No results found.")
         return
     output = ""
+
+    def display_word(obj, *formats):
+        return formats[len(obj) - 1].format(**obj)
+
     for result in results:
         japanese = result["japanese"]
-        output += ("**{}**" + (" {}" if len(japanese[0]) > 1 else "")).format(
-            *japanese[0].values()) + "\n"
+        output += display_word(japanese[0], "**{reading}**",
+                               "**{word}** {reading}") + "\n"
         new_line = ""
         if result["is_common"]:
             new_line += "Common word. "
@@ -189,11 +199,9 @@ async def _jisho_search(self, args, message):
                     output += ". *" + "*. *".join(sense[attr]) + "*"
             output += "\n"
         if len(japanese) > 1:
-            def f(x):
-                return ("{}" + (" ({})" if len(x) > 1 else "")).format(
-                    *x.values())
             output += "Other forms: " + ", ".join(
-                [f(x) for x in japanese[1:]]) + "\n"
+                [display_word(x, "{reading}", "{word} ({reading})") for x in
+                 japanese[1:]]) + "\n"
         output += "\n"
     for msg in split_every(output.strip(), 2000):
         await self.send_message(message.channel, msg)
