@@ -2,6 +2,7 @@ from .discordant import Discordant
 import asyncio
 import re
 import requests
+import urllib.parse
 from .utils import *
 
 
@@ -147,7 +148,10 @@ async def _jisho_search(self, args, message):
         limit, query = [result.group(x) for x in (1, 2)]
 
     base_req_url = "http://jisho.org/api/v1/search/words"
-    res = requests.get(base_req_url, {"keyword": query})
+    # for some reason, requests.get does not encode the url properly, if i use
+    # it with the second parameter as a dict.
+    res = requests.get(base_req_url + "?keyword=" + urllib.parse.quote(
+        query, encoding="utf-8"))
     if not res.ok:
         await self.send_message(message.channel, 'Error: ',
                                 res.status_code, '-', res.reason)
