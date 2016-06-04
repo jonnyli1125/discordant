@@ -172,7 +172,7 @@ async def _jisho_search(self, args, message):
     def display_word(obj, *formats):
         return formats[len(obj) - 1].format(**obj)
 
-    for result in results:
+    for i, result in enumerate(results):
         japanese = result["japanese"]
         output += display_word(japanese[0], "**{reading}**",
                                "**{word}** {reading}") + "\n"
@@ -203,5 +203,11 @@ async def _jisho_search(self, args, message):
                 [display_word(x, "{reading}", "{word} ({reading})") for x in
                  japanese[1:]]) + "\n"
         output += "\n"
-    for msg in split_every(output.strip(), 2000):
-        await self.send_message(message.channel, msg)
+    if output.count("\n") > 15 and message.server is not None:
+        await self.send_message(message.channel,
+                                "\n".join(output.split("\n")[:15]) +
+                                "\n... *Search results truncated. " +
+                                "Send me a command over PM to show more!*")
+    else:
+        for msg in split_every(output.strip(), 2000):
+            await self.send_message(message.channel, msg)
