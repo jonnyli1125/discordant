@@ -242,12 +242,9 @@ async def _alc_search(self, args, message):
     for result in results:
         words = [x for x in result.xpath('./span') if
                  x.attrib["class"].startswith("midashi")][0]
-        output += "**" + " ".join(
-            words.xpath('./span[@class="redtext"]/text()')) + "**"
-        reg_words = words.xpath("./text()")
-        if reg_words:
-            output += reg_words[0]
-        output += "\n"
+        highlight = " ".join(words.xpath('./span[@class="redtext"]/text()'))
+        output += re.sub("(" + highlight + ")", r"**\1**",
+                         words.text_content()) + "\n"
         div = result.xpath('./div')[0]
         div_text = div.xpath('./text()')
         div_ref = div.xpath('./span[@class="refvocab"]')
