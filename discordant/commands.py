@@ -266,7 +266,8 @@ async def _alc_search(self, args, message):
                             definition = "".join(li.xpath("./text()"))
                             definition_label = li.xpath(
                                 './span[@class="label"]/text()')
-                            if definition_label:
+                            # cheap ass fuckers dont actually give 文例's
+                            if definition_label and definition_label[0] != "文例":
                                 definition += definition_label[0]
                             definition_ref = li.xpath(
                                 './span[@class="refvocab"]/text()')
