@@ -166,8 +166,9 @@ async def _jisho_search(self, args, message):
     results = res.json()["data"][:int(limit)]
     if not results:
         sent = await self.send_message(message.channel, "No results found.")
-        await asyncio.sleep(5)
-        await self.delete_message(sent)
+        if message.server is not None:
+            await asyncio.sleep(5)
+            await self.delete_message(sent)
         return
     output = ""
 
@@ -234,6 +235,12 @@ async def _alc_search(self, args, message):
     for br in tree.xpath("*//br"):
         br.tail = "\n" + br.tail if br.tail else "\n"
     results = tree.xpath('//div[@id="resultsList"]/ul/li')[:int(limit)]
+    if not results:
+        sent = await self.send_message(message.channel, "No results found.")
+        if message.server is not None:
+            await asyncio.sleep(5)
+            await self.delete_message(sent)
+        return
     for result in results:
         words = [x for x in result.xpath('./span') if
                  x.attrib["class"].startswith("midashi")][0]
