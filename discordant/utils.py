@@ -44,4 +44,3 @@ def split_every(s, n):
 
 def is_url(s):  # good enough for now lmao
     return re.match(r'^https?:\/\/.*', s)
-

@@ -1,9 +1,9 @@
 from .discordant import Discordant
 import asyncio
-import re
 import requests
 import urllib.parse
 from .utils import *
+from lxml import html
 
 
 # @Discordant.register_handler(r'\bayy+$', re.I)
@@ -206,6 +206,81 @@ async def _jisho_search(self, args, message):
             output += "Other forms: " + ", ".join(
                 [display_word(x, "{reading}", "{word} ({reading})") for x in
                  japanese[1:]]) + "\n"
+        # output += "\n"
+    output = output.strip()
+    if output.count("\n") > 15 and message.server is not None:
+        await self.send_message(message.channel,
+                                "\n".join(output.split("\n")[:15]) +
+                                "\n... *Search results truncated. " +
+                                "Send me a command over PM to show more!*")
+    else:
+        for msg in split_every(output.strip(), 2000):
+            await self.send_message(message.channel, msg)
+
+
+@Discordant.register_command("alc")
+async def _alc_search(self, args, message):
+    if not args:
+        await self.send_message(message.channel, "!alc [limit] <query>")
+        return
+    limit = 1
+    query = args
+    result = re.match(r"^([0-9]+)\s+(.*)$", args)
+    if result:
+        limit, query = [result.group(x) for x in (1, 2)]
+    base_req_url = "http://eow.alc.co.jp/search"
+    res = requests.get(base_req_url + "?q=" + urllib.parse.quote(
+        query, encoding="utf-8"))
+    if not res.ok:
+        await self.send_message(message.channel, 'Error: ',
+                                res.status_code, '-', res.reason)
+        return
+
+    output = ""
+    tree = html.fromstring(res.content)
+    results = tree.xpath('//div[@id="resultsList"]/ul/li')[:int(limit)]
+    for result in results:
+        words = [x for x in result.xpath('./span') if
+                 x.attrib["class"].startswith("midashi")][0]
+        output += "**" + " ".join(
+            words.xpath('./span[@class="redtext"]/text()')) + "**"
+        reg_words = words.xpath("./text()")
+        if reg_words:
+            output += reg_words[0]
+        output += "\n"
+        div = result.xpath('./div')[0]
+        div_text = div.xpath('./text()')
+        div_ref = div.xpath('./span[@class="refvocab"]')
+        if div_text or div_ref:
+            output += "".join(div_text) + ", ".join(
+                [x.text_content() for x in div_ref])
+        else:
+            for element in div.xpath('./*'):
+                if element.tag == "span" \
+                        and element.attrib["class"] == "wordclass":
+                    output += element.text[1:-1] + "\n"
+                elif element.tag == "ol":
+                    lis = element.xpath('./li')
+                    if lis:
+                        for index, li in enumerate(lis):
+                            definition = "".join(li.xpath("./text()"))
+                            definition_label = li.xpath(
+                                './span[@class="label"]/text()')
+                            if definition_label:
+                                definition += definition_label[0]
+                            definition_ref = li.xpath(
+                                './span[@class="refvocab"]/text()')
+                            if definition_ref:
+                                definition += definition_ref[0]
+                            output += "{}. {}\n".format(
+                                index + 1, definition)
+                    else:
+                        output += "1. " + element.text
+                elif element.tag == "span" \
+                        and element.attrib["class"] == "attr":
+                    # alc pls lmao. this line also seems to already contain \n
+                    output += element.text_content().replace("＠", "カナ")
+                # output += "\n"
         output += "\n"
     output = output.strip()
     if output.count("\n") > 15 and message.server is not None:

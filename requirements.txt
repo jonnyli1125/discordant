@@ -2,3 +2,4 @@ cffi
 git+git://github.com/Rapptz/discord.py.git@async#egg=discord.py
 requests==2.9.1
 pytz
+lxml
