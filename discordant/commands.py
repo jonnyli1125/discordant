@@ -275,7 +275,7 @@ async def _alc_search(self, args, message):
                             output += "{}. {}\n".format(
                                 index + 1, definition)
                     else:
-                        output += "1. " + element.text
+                        output += "1. " + element.text_content() + "\n"
                 elif element.tag == "span" \
                         and element.attrib["class"] == "attr":
                     # alc pls lmao. this line also seems to already contain \n
