@@ -265,18 +265,23 @@ async def _alc_search(self, args, message):
                         for index, li in enumerate(lis):
                             definition = "".join(li.xpath("./text()"))
                             definition_label = li.xpath(
-                                './span[@class="label"]/text()')
+                                './span[@class="label"]')
                             # cheap ass fuckers dont actually give 文例's
-                            if definition_label and definition_label[0] != "文例":
-                                definition += definition_label[0]
+                            if definition_label:
+                                definition += " ".join(
+                                    [x.text_content() for x in
+                                     definition_label if
+                                     x.text_content() != "文例"])
                             definition_ref = li.xpath(
-                                './span[@class="refvocab"]/text()')
+                                './span[@class="refvocab"]')
                             if definition_ref:
-                                definition += definition_ref[0]
+                                definition += "".join(
+                                    [x.text_content() for x in definition_ref])
                             output += "{}. {}\n".format(
                                 index + 1, definition)
                     else:
-                        output += "1. " + element.text_content() + "\n"
+                        output += "1. " + re.sub(r"(｛[^｝]*｝)|(【文例】)", "",
+                                                 element.text_content()) + "\n"
                 elif element.tag == "span" \
                         and element.attrib["class"] == "attr":
                     # alc pls lmao. this line also seems to already contain \n
