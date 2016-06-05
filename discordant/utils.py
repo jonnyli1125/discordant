@@ -2,6 +2,7 @@ from datetime import datetime
 from pytz import timezone
 import pytz
 import re
+import os
 
 
 def get_timezone_by_code(code, date):
@@ -44,3 +45,12 @@ def split_every(s, n):
 
 def is_url(s):  # good enough for now lmao
     return re.match(r'^https?:\/\/.*', s)
+
+
+def long_message(output, truncate, max_lines=15):
+    output = output.strip()
+    return ["\n".join(output.split("\n")[:max_lines]) +
+            "\n... *Search results truncated. " +
+            "Send me a command over PM to show more!*"] \
+        if truncate and output.count("\n") > max_lines \
+        else split_every(output, 2000)

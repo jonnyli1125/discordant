@@ -207,15 +207,8 @@ async def _jisho_search(self, args, message):
                 [display_word(x, "{reading}", "{word} ({reading})") for x in
                  japanese[1:]]) + "\n"
         # output += "\n"
-    output = output.strip()
-    if output.count("\n") > 15 and message.server is not None:
-        await self.send_message(message.channel,
-                                "\n".join(output.split("\n")[:15]) +
-                                "\n... *Search results truncated. " +
-                                "Send me a command over PM to show more!*")
-    else:
-        for msg in split_every(output.strip(), 2000):
-            await self.send_message(message.channel, msg)
+    for msg in long_message(output, message.server is not None):
+        await self.send_message(message.channel, msg)
 
 
 @Discordant.register_command("alc")
@@ -275,22 +268,16 @@ async def _alc_search(self, args, message):
                                 definition += "".join(
                                     [x.text_content() for x in definition_ref])
                             output += "{}. {}\n".format(
-                                index + 1, definition)
+                                index + 1, definition.strip())
                     else:
-                        output += "1. " + re.sub(r"(｛[^｝]*｝)|(【文例】)", "",
-                                                 element.text_content()) + "\n"
+                        output += "1. " + re.sub(
+                            r"(｛[^｝]*｝)|(【文例】)", "",
+                            element.text_content()).strip()
                 elif element.tag == "span" \
                         and element.attrib["class"] == "attr":
                     # alc pls lmao. this line also seems to already contain \n
-                    output += element.text_content().replace("＠", "カナ")
+                    output += element.text_content().strip().replace("＠", "カナ")
                 # output += "\n"
-        output += "\n"
-    output = output.strip()
-    if output.count("\n") > 15 and message.server is not None:
-        await self.send_message(message.channel,
-                                "\n".join(output.split("\n")[:15]) +
-                                "\n... *Search results truncated. " +
-                                "Send me a command over PM to show more!*")
-    else:
-        for msg in split_every(output.strip(), 2000):
-            await self.send_message(message.channel, msg)
+        output = output.strip() + "\n"
+    for msg in long_message(output, message.server is not None):
+        await self.send_message(message.channel, msg)

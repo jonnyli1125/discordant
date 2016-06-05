@@ -6,6 +6,7 @@ from os import path
 import sys
 import requests
 from discordant.utils import *
+import asyncio
 
 
 Command = namedtuple('Command', ['name', 'arg_func', 'aliases'])
