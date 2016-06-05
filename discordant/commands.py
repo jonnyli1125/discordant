@@ -165,14 +165,16 @@ async def _jisho_search(self, args, message):
 
     results = res.json()["data"][:int(limit)]
     if not results:
-        await self.send_message(message.channel, "No results found.")
+        sent = await self.send_message(message.channel, "No results found.")
+        await asyncio.sleep(5)
+        await self.delete_message(sent)
         return
     output = ""
 
     def display_word(obj, *formats):
         return formats[len(obj) - 1].format(**obj)
 
-    for i, result in enumerate(results):
+    for result in results:
         japanese = result["japanese"]
         output += display_word(japanese[0], "**{reading}**",
                                "**{word}** {reading}") + "\n"
@@ -194,15 +196,18 @@ async def _jisho_search(self, args, message):
                 output += "*" + ", ".join(parts) + "*\n"
             output += str(index + 1) + ". " + "; ".join(
                 sense["english_definitions"])
-            for attr in ["tags", "see_also", "info"]:
+            for attr in ["tags", "info"]:
                 if sense[attr]:
                     output += ". *" + "*. *".join(sense[attr]) + "*"
+            if sense["see_also"]:
+                output += ". *See also: " + ", ".join(sense["see_also"]) + "*"
             output += "\n"
         if len(japanese) > 1:
             output += "Other forms: " + ", ".join(
                 [display_word(x, "{reading}", "{word} ({reading})") for x in
                  japanese[1:]]) + "\n"
         output += "\n"
+    output = output.strip()
     if output.count("\n") > 15 and message.server is not None:
         await self.send_message(message.channel,
                                 "\n".join(output.split("\n")[:15]) +
