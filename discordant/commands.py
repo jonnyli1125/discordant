@@ -231,6 +231,8 @@ async def _alc_search(self, args, message):
 
     output = ""
     tree = html.fromstring(res.content)
+    for br in tree.xpath("*//br"):
+        br.tail = "\n" + br.tail if br.tail else "\n"
     results = tree.xpath('//div[@id="resultsList"]/ul/li')[:int(limit)]
     for result in results:
         words = [x for x in result.xpath('./span') if
@@ -239,45 +241,28 @@ async def _alc_search(self, args, message):
         output += re.sub("(" + highlight + ")", r"**\1**",
                          words.text_content()) + "\n"
         div = result.xpath('./div')[0]
-        div_text = div.xpath('./text()')
-        div_ref = div.xpath('./span[@class="refvocab"]')
-        if div_text or div_ref:
-            output += "".join(div_text) + ", ".join(
-                [x.text_content() for x in div_ref])
+        if div.xpath('./text()') or div.xpath('./span[@class="refvocab"]'):
+            output += div.text_content()
         else:
             for element in div.xpath('./*'):
-                if element.tag == "span" \
-                        and element.attrib["class"] == "wordclass":
-                    output += element.text[1:-1] + "\n"
-                elif element.tag == "ol":
+                if element.tag == "span":
+                    if element.attrib["class"] == "wordclass":
+                        output += element.text[1:-1] + "\n"
+                    elif element.attrib["class"] == "attr":
+                        # alc pls lmao.
+                        output += element.text_content().strip().replace(
+                            "＠", "カナ") + "\n"
+                elif element.tag == "ol" or element.tag == "ul":
                     lis = element.xpath('./li')
                     if lis:
                         for index, li in enumerate(lis):
-                            definition = "".join(li.xpath("./text()"))
-                            definition_label = li.xpath(
-                                './span[@class="label"]')
-                            # cheap ass fuckers dont actually give 文例's
-                            if definition_label:
-                                definition += " ".join(
-                                    [x.text_content() for x in
-                                     definition_label if
-                                     x.text_content() != "文例"])
-                            definition_ref = li.xpath(
-                                './span[@class="refvocab"]')
-                            if definition_ref:
-                                definition += "".join(
-                                    [x.text_content() for x in definition_ref])
                             output += "{}. {}\n".format(
-                                index + 1, definition.strip())
+                                index + 1, li.text_content().strip())
                     else:
-                        output += "1. " + re.sub(
-                            r"(｛[^｝]*｝)|(【文例】)", "",
-                            element.text_content()).strip()
-                elif element.tag == "span" \
-                        and element.attrib["class"] == "attr":
-                    # alc pls lmao. this line also seems to already contain \n
-                    output += element.text_content().strip().replace("＠", "カナ")
+                        output += "1. " + element.text_content().strip() + "\n"
                 # output += "\n"
-        output = output.strip() + "\n"
+        # cheap ass fuckers dont actually give 文例's
+        # also removes kana things
+        output = re.sub(r"(｛[^｝]*｝)|(【文例】)", "", output.strip()) + "\n"
     for msg in long_message(output, message.server is not None):
         await self.send_message(message.channel, msg)

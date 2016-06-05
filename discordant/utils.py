@@ -2,7 +2,6 @@ from datetime import datetime
 from pytz import timezone
 import pytz
 import re
-import os
 
 
 def get_timezone_by_code(code, date):
