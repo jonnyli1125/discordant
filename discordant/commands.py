@@ -4,6 +4,8 @@ import requests
 import urllib.parse
 from .utils import *
 from lxml import html
+import discord.game
+import os.path
 
 
 # @Discordant.register_handler(r'\bayy+$', re.I)
@@ -142,6 +144,34 @@ async def _convert_timezone(self, args, message):
                                 "Timezone conversion failed: " + str(e))
 
 
+@Discordant.register_command("client")
+async def _client_settings(self, args, message):
+    if message.author.id not in self.controllers:
+        await self.send_message(message.channel,
+                                "You are not authorized to use this command.")
+        return
+    kwargs = dict(x.split("=") for x in args.split())
+    if "game" in kwargs:
+        game = discord.Game(name=kwargs["game"]) if kwargs["game"] else None
+        await self.change_status(game=game)
+        del kwargs["game"]
+    if "avatar" in kwargs:
+        if is_url(kwargs["avatar"]):
+            kwargs["avatar"] = requests.get(
+                kwargs["avatar"], stream=True).raw.read()
+        elif os.path.isfile(kwargs["avatar"]):
+            kwargs["avatar"] = open(kwargs["avatar"], "rb").read()
+        else:
+            await self.send_message(message.channel,
+                                    "Invalid avatar url or path.")
+            return
+    await self.edit_profile(self._password, **kwargs)
+    sent = await self.send_message(message.channel, "Settings updated.")
+    if message.server is not None:
+        await asyncio.sleep(5)
+        await self.delete_message(sent)
+
+
 @Discordant.register_command("jisho")
 async def _jisho_search(self, args, message):
     if not args:
@@ -232,8 +262,6 @@ async def _alc_search(self, args, message):
 
     output = ""
     tree = html.fromstring(res.content)
-    for br in tree.xpath("*//br"):
-        br.tail = "\n" + br.tail if br.tail else "\n"
     results = tree.xpath('//div[@id="resultsList"]/ul/li')[:int(limit)]
     if not results:
         sent = await self.send_message(message.channel, "No results found.")
@@ -251,6 +279,8 @@ async def _alc_search(self, args, message):
         if div.xpath('./text()') or div.xpath('./span[@class="refvocab"]'):
             output += div.text_content()
         else:
+            for br in div.xpath("*//br"):
+                br.tail = "\n" + br.tail if br.tail else "\n"
             for element in div.xpath('./*'):
                 if element.tag == "span":
                     if element.attrib["class"] == "wordclass":

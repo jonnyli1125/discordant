@@ -26,7 +26,7 @@ class Discordant(discord.Client):
         self._token = ''
         self.command_char = ''
         self.game = None
-        self.avatar = None
+        self.controllers = []
         self.config = ConfigParser()
 
         self.load_config(config_file)
@@ -53,18 +53,9 @@ class Discordant(discord.Client):
             self.__email = self.config['Login']['email']
             self._password = self.config['Login']['password']
         self.command_char = self.config['Commands']['command_char']
-        game_name = self.config["Client"]["game"]
-        if game_name:
-            self.game = discord.Game(name=game_name)
-        avatar_path = self.config["Client"]["avatar"]
-        if is_url(avatar_path):
-            self.avatar = requests.get(avatar_path, stream=True).raw.read()
-        elif path.isfile(avatar_path):
-            self.avatar = open(avatar_path, "rb").read()
-        else:
-            print("Avatar could not be found.")
-            print("Please enter a valid file path or URL.")
-            sys.exit(-1)
+        if self.config["Client"]["game"]:
+            self.game = discord.Game(name=self.config["Client"]["game"])
+        self.controllers = self.config["Client"]["controllers"].split()
         self.load_aliases()
 
     def load_aliases(self):
@@ -79,7 +70,6 @@ class Discordant(discord.Client):
 
     async def on_ready(self):
         await self.change_status(game=self.game)
-        await self.edit_profile(self._password, avatar=self.avatar)
 
     async def on_message(self, message):
         # TODO: logging
