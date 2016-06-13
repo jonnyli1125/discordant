@@ -1,0 +1,25 @@
+{
+	"login": {
+		"email": "example@example.com",
+		"password": "123",
+		"token": ""
+	},
+	"commands": {
+		"command_char": "!"
+	},
+	"aliases": {
+		"help": ["commands", "cmds"]
+	},
+	"api-keys": {
+		"youtube": "xyz",
+		"mongodb": ""
+	},
+	"client": {
+		"game": "example game name",
+		"controllers": ["<user id>"]
+	},
+	"moderation": {
+		"warn_duration": 336,
+		"mute_duration": 48
+	}
+}

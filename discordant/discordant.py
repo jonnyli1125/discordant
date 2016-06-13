@@ -1,12 +1,14 @@
-import discord
+import json
+import re
+import sys
 from collections import namedtuple
-from configparser import ConfigParser
 from inspect import iscoroutinefunction
 from os import path
-import sys
-import requests
-from discordant.utils import *
 
+import discord
+import requests
+
+from discordant.utils import is_url
 
 Command = namedtuple('Command', ['name', 'arg_func', 'aliases'])
 
@@ -18,16 +20,15 @@ class Discordant(discord.Client):
     _aliases = {}
     _triggers = set()
 
-    def __init__(self, config_file='config.ini'):
+    def __init__(self, config_file='config.json'):
         super().__init__()
 
         self.__email = ''  # prevent a conflict with discord.Client#email
         self._password = ''
         self._token = ''
         self.command_char = ''
-        self.game = None
         self.controllers = []
-        self.config = ConfigParser()
+        self.config = {}
 
         self.load_config(config_file)
 
@@ -42,26 +43,24 @@ class Discordant(discord.Client):
             self.config = requests.get(config_file).json()
         elif not path.exists(config_file):
             print("No config file found (expected '{}').".format(config_file))
-            print("Copy config-example.ini to", config_file,
+            print("Copy config-example.json to", config_file,
                   "and edit it to use the appropriate settings.")
             sys.exit(-1)
         else:
-            self.config.read(config_file)
-        if 'token' in self.config['Login']:
-            self._token = self.config['Login']['token']
+            with open(config_file, "r") as f:
+                self.config = json.load(f)
+        if 'token' in self.config['login']:
+            self._token = self.config['login']['token']
         else:
-            self.__email = self.config['Login']['email']
-            self._password = self.config['Login']['password']
-        self.command_char = self.config['Commands']['command_char']
-        if self.config["Client"]["game"]:
-            self.game = discord.Game(name=self.config["Client"]["game"])
-        self.controllers = self.config["Client"]["controllers"].split()
+            self.__email = self.config['login']['email']
+            self._password = self.config['login']['password']
+        self.command_char = self.config['commands']['command_char']
+        self.controllers = self.config["client"]["controllers"]
         self.load_aliases()
 
     def load_aliases(self):
-        aliases = self.config['Aliases']
+        aliases = self.config['aliases']
         for base_cmd, alias_list in aliases.items():
-            alias_list = alias_list.split(',')
             cmd_name = self._aliases[base_cmd]
 
             for alias in alias_list:
@@ -69,7 +68,9 @@ class Discordant(discord.Client):
                 self._commands[cmd_name].aliases.append(alias)
 
     async def on_ready(self):
-        await self.change_status(game=self.game)
+        await self.change_status(
+            game=discord.Game(name=self.config["client"]["game"])
+            if self.config["client"]["game"] else None)
 
     async def on_message(self, message):
         # TODO: logging

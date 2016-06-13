@@ -1,11 +1,17 @@
-from .discordant import Discordant
 import asyncio
-import requests
-import urllib.parse
-from .utils import *
-from lxml import html
-import discord.game
 import os.path
+import re
+import urllib.parse
+from datetime import datetime
+
+import discord.game
+import pytz
+import requests
+from lxml import html
+from pytz import timezone
+
+import discordant.utils as utils
+from .discordant import Discordant
 
 
 # @Discordant.register_handler(r'\bayy+$', re.I)
@@ -17,7 +23,7 @@ async def _ayy_lmao(self, match, message):
 async def _youtube_search(self, args, message):
     base_req_url = 'https://www.googleapis.com/youtube/v3/search'
     req_args = {
-        'key': self.config['API-Keys']['youtube'],
+        'key': self.config['api-keys']['youtube'],
         'part': 'snippet',
         'type': 'video',
         'maxResults': 1,
@@ -125,17 +131,48 @@ async def _help(self, args, message):
 
 @Discordant.register_command("timezone")
 async def _convert_timezone(self, args, message):
+    def get_timezone_by_code(code, date):
+        code = code.upper()
+        for tz_str in pytz.all_timezones:
+            tz = timezone(tz_str)
+            if tz.tzname(date) == code:
+                return tz
+        raise ValueError(code + ": not a valid time zone code")
+
+    def convert_timezone(date, tz_from, tz_to):
+        return tz_from.localize(date).astimezone(tz_to)
+
+    def read_time(dt_str):
+        formats = ["%I%p", "%I:%M%p", "%H", "%H:%M"]
+        for f in formats:
+            try:
+                read_dt = datetime.strptime(dt_str, f)
+                return datetime.now().replace(hour=read_dt.hour,
+                                              minute=read_dt.minute)
+            except ValueError:
+                pass
+        raise ValueError(dt_str + ": not a valid time format")
+
+    def relative_date_str(dt_1, dt_2):
+        delta = dt_2.day - dt_1.day
+        if delta == 0:
+            return "same day"
+        else:
+            return "{} day{} {}".format(abs(delta),
+                                        "s" if abs(delta) != 1 else "",
+                                        "ahead" if delta > 0 else "behind")
+
     try:
         split = args.split()
         if len(split) != 3:
             await self.send_message(
                 message.channel, "!timezone <time> <from> <to>")
         dt = read_time(split[0])
-        tz_from = get_timezone_by_code(split[1], dt)
-        tz_to = get_timezone_by_code(split[2], dt)
-        new_dt = convert_timezone(dt, tz_from, tz_to)
+        tz_f = get_timezone_by_code(split[1], dt)
+        tz_t = get_timezone_by_code(split[2], dt)
+        new_dt = convert_timezone(dt, tz_f, tz_t)
         await self.send_message(message.channel, "{} is {}, {}".format(
-            tz_from.localize(dt).strftime("%I:%M %p %Z"),
+            tz_f.localize(dt).strftime("%I:%M %p %Z"),
             new_dt.strftime("%I:%M %p %Z"),
             relative_date_str(dt, new_dt))
                                 )
@@ -150,13 +187,15 @@ async def _client_settings(self, args, message):
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
-    kwargs = dict(x.split("=") for x in args.split())
+    if not args:
+        await self.send_message(message.channel, "!client [*field*=value]")
+    kwargs = utils.get_kwargs(args)
     if "game" in kwargs:
         game = discord.Game(name=kwargs["game"]) if kwargs["game"] else None
         await self.change_status(game=game)
         del kwargs["game"]
     if "avatar" in kwargs:
-        if is_url(kwargs["avatar"]):
+        if utils.is_url(kwargs["avatar"]):
             kwargs["avatar"] = requests.get(
                 kwargs["avatar"], stream=True).raw.read()
         elif os.path.isfile(kwargs["avatar"]):
@@ -166,23 +205,33 @@ async def _client_settings(self, args, message):
                                     "Invalid avatar url or path.")
             return
     await self.edit_profile(self._password, **kwargs)
-    sent = await self.send_message(message.channel, "Settings updated.")
-    if message.server is not None:
-        await asyncio.sleep(5)
-        await self.delete_message(sent)
+    await self.send_message(message.channel, "Settings updated.")
 
 
-@Discordant.register_command("jisho")
-async def _jisho_search(self, args, message):
+async def _dict_search_args_parse(self, args, message, cmd):
     if not args:
-        await self.send_message(message.channel, "!jisho [limit] <query>")
+        await self.send_message(message.channel, "!" + cmd + " [limit] <query>")
         return
     limit = 1
     query = args
     result = re.match(r"^([0-9]+)\s+(.*)$", args)
     if result:
         limit, query = [result.group(x) for x in (1, 2)]
+    return limit, query
+    # keys = ["limit"]
+    # kwargs = utils.get_kwargs(args, keys)
+    # try:
+    #     limit = int(kwargs["limit"])
+    #     if limit <= 0:
+    #         raise ValueError
+    # except (ValueError, KeyError):
+    #     limit = 1
+    # query = utils.strip_kwargs(args, keys)
 
+
+@Discordant.register_command("jisho")
+async def _jisho_search(self, args, message):
+    limit, query = await _dict_search_args_parse(self, args, message, "jisho")
     base_req_url = "http://jisho.org/api/v1/search/words"
     # for some reason, requests.get does not encode the url properly, if i use
     # it with the second parameter as a dict.
@@ -238,20 +287,13 @@ async def _jisho_search(self, args, message):
                 [display_word(x, "{reading}", "{word} ({reading})") for x in
                  japanese[1:]]) + "\n"
         # output += "\n"
-    for msg in long_message(output, message.server is not None):
+    for msg in utils.long_message(output, message.server is not None):
         await self.send_message(message.channel, msg)
 
 
 @Discordant.register_command("alc")
 async def _alc_search(self, args, message):
-    if not args:
-        await self.send_message(message.channel, "!alc [limit] <query>")
-        return
-    limit = 1
-    query = args
-    result = re.match(r"^([0-9]+)\s+(.*)$", args)
-    if result:
-        limit, query = [result.group(x) for x in (1, 2)]
+    limit, query = await _dict_search_args_parse(self, args, message, "alc")
     base_req_url = "http://eow.alc.co.jp/search"
     res = requests.get(base_req_url + "?q=" + urllib.parse.quote(
         query, encoding="utf-8"))
@@ -301,5 +343,18 @@ async def _alc_search(self, args, message):
         # cheap ass fuckers dont actually give 文例's
         # also removes kana things
         output = re.sub(r"(｛[^｝]*｝)|(【文例】)", "", output.strip()) + "\n"
-    for msg in long_message(output, message.server is not None):
+    for msg in utils.long_message(output, message.server is not None):
         await self.send_message(message.channel, msg)
+
+
+@Discordant.register_command("warn")
+async def _warn(self, args, message):
+    if discord.Permissions.manage_roles in \
+            [x.permissions for x in message.author.roles]:
+        await self.send_message(message.channel,
+                                "You are not authorized to use this command.")
+        return
+    mod_log = self.get_channel(self.config["moderation"]["log_channel"])
+    # add the warn role
+    # add to db
+    # output to mod log

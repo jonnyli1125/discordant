@@ -1,41 +1,7 @@
-from datetime import datetime
-from pytz import timezone
-import pytz
 import re
-
-
-def get_timezone_by_code(code, date):
-    code = code.upper()
-    for tz_str in pytz.all_timezones:
-        tz = timezone(tz_str)
-        if tz.tzname(date) == code:
-            return tz
-    raise ValueError(code + ": not a valid time zone code")
-
-
-def convert_timezone(date, tz_from, tz_to):
-    return tz_from.localize(date).astimezone(tz_to)
-
-
-def read_time(dt_str):
-    formats = ["%I%p", "%I:%M%p", "%H", "%H:%M"]
-    for f in formats:
-        try:
-            read_dt = datetime.strptime(dt_str, f)
-            return datetime.now().replace(hour=read_dt.hour, minute=read_dt.minute)
-        except ValueError:
-            pass
-    raise ValueError(dt_str + ": not a valid time format")
-
-
-def relative_date_str(dt_1, dt_2):
-    delta = dt_2.day - dt_1.day
-    if delta == 0:
-        return "same day"
-    else:
-        return "{} day{} {}".format(abs(delta),
-                                    "s" if abs(delta) != 1 else "",
-                                    "ahead" if delta > 0 else "behind")
+import shlex
+import sys
+import pymongo
 
 
 def split_every(s, n):
@@ -53,3 +19,19 @@ def long_message(output, truncate, max_lines=15):
             "Send me a command over PM to show more!*"] \
         if truncate and output.count("\n") > max_lines \
         else split_every(output, 2000)
+
+
+def get_kwargs(args_str, keys=None):
+    return dict(
+        x.split("=") for x in shlex.split(args_str)
+        if "=" in x and
+        (True if keys is None else x[:x.find("=")] in keys))
+
+
+def strip_kwargs(args_str, keys=None):
+    return " ".join(
+        [x for x in shlex.split(args_str)
+         if not ("=" in x and
+         (True if keys is None else x[:x.find("=")] not in keys))])
+
+

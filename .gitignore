@@ -5,5 +5,5 @@ venv/
 *~
 *.pyc
 
-config.ini
+config.json
 logs/
