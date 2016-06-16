@@ -65,7 +65,9 @@ def is_punished(collection, member, action):
     if not cursor:
         return False
     if action == "ban":
-        return discord.utils.get(cursor, action="ban") is not None
+        # for some reason discord.utils.get doesnt work
+        return discord.utils.find(
+            lambda x: x["action"] == "ban", cursor) is not None
     else:
         def f(x):
             return x["action"] == action and \
