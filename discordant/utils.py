@@ -85,3 +85,7 @@ def is_punished(collection, member, action):
                 (xd > ad and (xd - ad).seconds / float(3600) < active[
                     "duration"])
         return discord.utils.find(g, cursor) is None
+
+
+def has_permission(user, permission):
+    return len([x for x in user.roles if getattr(x.permissions, permission)]) > 0

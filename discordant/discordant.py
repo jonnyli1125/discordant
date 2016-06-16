@@ -13,7 +13,7 @@ import requests
 
 import discordant.utils as utils
 
-Command = namedtuple('Command', ['name', 'arg_func', 'aliases'])
+Command = namedtuple('Command', ['name', 'arg_func', 'aliases', 'section'])
 
 
 class Discordant(discord.Client):
@@ -183,7 +183,8 @@ class Discordant(discord.Client):
         return wrapper
 
     @classmethod
-    def register_command(cls, name, aliases=None, arg_func=lambda args: args):
+    def register_command(cls, name, aliases=None, arg_func=lambda args: args,
+                         section="general"):
         if aliases is None:
             aliases = []
         aliases.append(name)
@@ -199,7 +200,8 @@ class Discordant(discord.Client):
                 func_name += '_'
 
             setattr(cls, func_name, func)
-            cls._commands[func_name] = Command(func_name, arg_func, aliases)
+            cls._commands[func_name] = Command(
+                func_name, arg_func, aliases, section)
             # associate the given aliases with the command
             for alias in aliases:
                 if alias in cls._aliases:

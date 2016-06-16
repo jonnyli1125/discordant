@@ -14,6 +14,7 @@ import discordant.utils as utils
 from .discordant import Discordant
 
 
+#region other
 # @Discordant.register_handler(r'\bayy+$', re.I)
 async def _ayy_lmao(self, match, message):
     await self.send_message(message.channel, 'lmao')
@@ -121,12 +122,18 @@ async def _sleep(self, args, message):
 async def _exit(self, args, message):
     import sys
     sys.exit()
+#endregion
 
 
+#region general
 @Discordant.register_command("help")
 async def _help(self, args, message):
-    await self.send_message(message.channel, "Commands: " + ", ".join(
-        [self._commands[x].aliases[0] for x in self._commands]))
+    if not args:
+        args = "general"
+    cmds = [self._commands[x].aliases[0] for x in self._commands
+            if self._commands[x].section.lower() == args.lower()]
+    await self.send_message(
+        message.channel, "Commands: " + ", ".join(cmds) if cmds else "*none*")
 
 
 @Discordant.register_command("timezone")
@@ -179,33 +186,6 @@ async def _convert_timezone(self, args, message):
     except ValueError as e:
         await self.send_message(message.channel,
                                 "Timezone conversion failed: " + str(e))
-
-
-@Discordant.register_command("client")
-async def _client_settings(self, args, message):
-    if message.author.id not in self.controllers:
-        await self.send_message(message.channel,
-                                "You are not authorized to use this command.")
-        return
-    if not args:
-        await self.send_message(message.channel, "!client [*field*=value]")
-    kwargs = utils.get_kwargs(args)
-    if "game" in kwargs:
-        game = discord.Game(name=kwargs["game"]) if kwargs["game"] else None
-        await self.change_status(game=game)
-        del kwargs["game"]
-    if "avatar" in kwargs:
-        if utils.is_url(kwargs["avatar"]):
-            kwargs["avatar"] = requests.get(
-                kwargs["avatar"], stream=True).raw.read()
-        elif os.path.isfile(kwargs["avatar"]):
-            kwargs["avatar"] = open(kwargs["avatar"], "rb").read()
-        else:
-            await self.send_message(message.channel,
-                                    "Invalid avatar url or path.")
-            return
-    await self.edit_profile(self._password, **kwargs)
-    await self.send_message(message.channel, "Settings updated.")
 
 
 async def _dict_search_args_parse(self, args, message, cmd):
@@ -345,8 +325,39 @@ async def _alc_search(self, args, message):
         output = re.sub(r"(｛[^｝]*｝)|(【文例】)", "", output.strip()) + "\n"
     for msg in utils.long_message(output, message.server is not None):
         await self.send_message(message.channel, msg)
+#endregion
 
 
+#region bot
+@Discordant.register_command("client", section="bot")
+async def _client_settings(self, args, message):
+    if message.author.id not in self.controllers:
+        await self.send_message(message.channel,
+                                "You are not authorized to use this command.")
+        return
+    if not args:
+        await self.send_message(message.channel, "!client [*field*=value]")
+    kwargs = utils.get_kwargs(args)
+    if "game" in kwargs:
+        game = discord.Game(name=kwargs["game"]) if kwargs["game"] else None
+        await self.change_status(game=game)
+        del kwargs["game"]
+    if "avatar" in kwargs:
+        if utils.is_url(kwargs["avatar"]):
+            kwargs["avatar"] = requests.get(
+                kwargs["avatar"], stream=True).raw.read()
+        elif os.path.isfile(kwargs["avatar"]):
+            kwargs["avatar"] = open(kwargs["avatar"], "rb").read()
+        else:
+            await self.send_message(message.channel,
+                                    "Invalid avatar url or path.")
+            return
+    await self.edit_profile(self._password, **kwargs)
+    await self.send_message(message.channel, "Settings updated.")
+#endregion
+
+
+#region moderation
 def _punishment_format(message, document):
     if "user" not in document:
         user = message.server.get_member(document["user_id"])
@@ -371,7 +382,7 @@ def _punishment_history(message, cursor):
     return "\n".join(reversed([_punishment_format(message, x) for x in cursor]))
 
 
-@Discordant.register_command("modhistory")
+@Discordant.register_command("modhistory", section="mod")
 async def _moderation_history(self, args, message):
     if not args:
         await self.send_message(message.channel, "!modhistory <user>")
@@ -394,7 +405,7 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
         await self.send_message(message.channel,
                                 "Do not use this command from PM.")
         return
-    if not [x for x in message.author.roles if x.permissions.manage_roles]:
+    if not utils.has_permission(message.author, "manage_roles"):
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
@@ -414,6 +425,10 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
     user = utils.get_user(user_search, message.server.members)
     if user is None:
         await self.send_message(message.channel, "User could not be found.")
+        return
+    if utils.has_permission(user, "manage_roles"):
+        await self.send_message(message.channel,
+                                "Cannot " + cmd + " another moderator.")
         return
     duration = utils.get_from_kwargs(
         "duration", kwargs, self.config["moderation"][cmd + "_duration"])
@@ -464,12 +479,12 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
         _punishment_format(message, document))
 
 
-@Discordant.register_command("warn")
+@Discordant.register_command("warn", section="mod")
 async def _warn(self, args, message):
     await _mod_cmd(self, args, message, "warn", "warning", "Warned")
 
 
-@Discordant.register_command("mute")
+@Discordant.register_command("mute", section="mod")
 async def _mute(self, args, message):
     await _mod_cmd(self, args, message, "mute", "mute", "Muted")
 
@@ -516,19 +531,19 @@ async def _mod_remove_cmd(self, args, message, cmd, action, role_name):
         _punishment_format(message, document))
 
 
-@Discordant.register_command("unwarn")
+@Discordant.register_command("unwarn", section="mod")
 async def _unwarn(self, args, message):
     await _mod_remove_cmd(
         self, args, message, "unwarn", "remove warning", "Warned")
 
 
-@Discordant.register_command("unmute")
+@Discordant.register_command("unmute", section="mod")
 async def _unmute(self, args, message):
     await _mod_remove_cmd(
         self, args, message, "unmute", "remove mute", "Muted")
 
 
-@Discordant.register_command("ban")
+@Discordant.register_command("ban", section="mod")
 async def _ban(self, args, message):
     if message.server is None:
         await self.send_message(message.channel,
@@ -544,7 +559,14 @@ async def _ban(self, args, message):
     user_search = args.split()[0]
     reason = args[len(user_search) + 1:] if " " in args else "No reason given."
     user = utils.get_user(user_search, message.server.members)
-    await self.ban(user.server, user)
+    if user is None:
+        await self.send_message(message.channel, "User could not be found.")
+        return
+    if utils.has_permission(user, "ban_members"):
+        await self.send_message(message.channel,
+                                "Cannot ban another moderator.")
+        return
+    await self.ban(user)
     db = self.mongodb_client.get_default_database()
     collection = db["punishments"]
     if utils.is_punished(collection, user, "ban"):
@@ -563,3 +585,4 @@ async def _ban(self, args, message):
     await self.send_message(
         self.get_channel(self.config["moderation"]["log_channel"]),
         _punishment_format(message, document))
+#endregion
