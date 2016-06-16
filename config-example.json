@@ -20,6 +20,8 @@
 	},
 	"moderation": {
 		"warn_duration": 336,
-		"mute_duration": 48
+		"mute_duration": 48,
+		"log_channel": "<channel id>"
+		"punishment_check_rate": 3600
 	}
 }

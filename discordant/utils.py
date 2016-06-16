@@ -1,7 +1,8 @@
 import re
 import shlex
-import sys
-import pymongo
+from datetime import datetime
+
+import discord
 
 
 def split_every(s, n):
@@ -12,7 +13,7 @@ def is_url(s):  # good enough for now lmao
     return re.match(r'^https?:\/\/.*', s)
 
 
-def long_message(output, truncate, max_lines=15):
+def long_message(output, truncate=False, max_lines=15):
     output = output.strip()
     return ["\n".join(output.split("\n")[:max_lines]) +
             "\n... *Search results truncated. " +
@@ -25,13 +26,60 @@ def get_kwargs(args_str, keys=None):
     return dict(
         x.split("=") for x in shlex.split(args_str)
         if "=" in x and
-        (True if keys is None else x[:x.find("=")] in keys))
+        (True if keys is None else x.split("=")[0] in keys))
 
 
 def strip_kwargs(args_str, keys=None):
     return " ".join(
         [x for x in shlex.split(args_str)
          if not ("=" in x and
-         (True if keys is None else x[:x.find("=")] not in keys))])
+         (True if keys is None else x.split("=")[0] in keys))])
 
 
+def get_from_kwargs(key, kwargs, default):
+    return kwargs[key] if key in kwargs else default
+
+
+def get_user(search, seq):
+    def f(x):
+        nonlocal search
+        if search == x.mention:
+            return True
+        if search == x.name + "#" + x.discriminator:
+            return True
+        if search == x.name or search == x.nick:
+            return True
+        search = search.lower()
+        if x.name.lower().startswith(search):
+            return True
+        if x.nick and x.nick.lower().startswith(search):
+            return True
+        return False
+
+    return discord.utils.find(f, seq)
+
+
+def is_punished(collection, member, action):
+    cursor = list(collection.find({"user_id": member.id}))
+    cursor.reverse()
+    if not cursor:
+        return False
+    if action == "ban":
+        return discord.utils.get(cursor, action="ban") is not None
+    else:
+        def f(x):
+            return x["action"] == action and \
+                   (datetime.utcnow() - x["date"]).seconds / float(3600) < x[
+                       "duration"]
+        active = discord.utils.find(f, cursor)
+        if not active:
+            return False
+
+        def g(x):
+            nonlocal active
+            xd = x["date"]
+            ad = active["date"]
+            return x["action"] == "remove " + action and \
+                (xd > ad and (xd - ad).seconds / float(3600) < active[
+                    "duration"])
+        return discord.utils.find(g, cursor) is None

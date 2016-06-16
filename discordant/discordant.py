@@ -1,14 +1,17 @@
+import asyncio
 import json
 import re
 import sys
+import threading
 from collections import namedtuple
 from inspect import iscoroutinefunction
 from os import path
 
 import discord
+import pymongo
 import requests
 
-from discordant.utils import is_url
+import discordant.utils as utils
 
 Command = namedtuple('Command', ['name', 'arg_func', 'aliases'])
 
@@ -28,6 +31,7 @@ class Discordant(discord.Client):
         self._token = ''
         self.command_char = ''
         self.controllers = []
+        self.mongodb_client = None
         self.config = {}
 
         self.load_config(config_file)
@@ -39,7 +43,7 @@ class Discordant(discord.Client):
             super().run(self.__email, self._password)
 
     def load_config(self, config_file):
-        if is_url(config_file):
+        if utils.is_url(config_file):
             self.config = requests.get(config_file).json()
         elif not path.exists(config_file):
             print("No config file found (expected '{}').".format(config_file))
@@ -56,6 +60,8 @@ class Discordant(discord.Client):
             self._password = self.config['login']['password']
         self.command_char = self.config['commands']['command_char']
         self.controllers = self.config["client"]["controllers"]
+        self.mongodb_client = pymongo.MongoClient(
+            self.config["api-keys"]["mongodb"])
         self.load_aliases()
 
     def load_aliases(self):
@@ -71,6 +77,57 @@ class Discordant(discord.Client):
         await self.change_status(
             game=discord.Game(name=self.config["client"]["game"])
             if self.config["client"]["game"] else None)
+
+        db = self.mongodb_client.get_default_database()
+        collection = db["punishments"]
+        cursor = list(collection.find())
+        cursor.reverse()
+        server = self.get_channel(
+            self.config["moderation"]["log_channel"]).server
+        for document in [x for x in cursor if x["action"] != "ban" and
+                         not x["action"].startswith("removed")]:
+            member = server.get_member(document["user_id"])
+            action = document["action"]
+            if utils.is_punished(collection, member, action):
+                await self.add_punishment_timer(member, action)
+
+    async def add_punishment_timer(self, member, action):
+        db = self.mongodb_client.get_default_database()
+        collection = db["punishments"]
+        punishments = {"warning": "Warned", "mute": "Muted"}
+
+        async def f():
+            nonlocal collection, punishments, member, action
+            while True:
+                if not utils.is_punished(collection, member, action):
+                    await self.remove_roles(
+                        member,
+                        discord.utils.get(
+                            member.server.roles, name=punishments[action]))
+                    break
+                await asyncio.sleep(
+                    self.config["moderation"]["punishment_check_rate"])
+
+        def loop_in_thread(l):
+            asyncio.set_event_loop(l)
+            l.run_until_complete(f())
+
+        loop = asyncio.new_event_loop()
+        t = threading.Thread(target=loop_in_thread, args=(loop,))
+        t.start()
+
+    async def on_member_join(self, member):
+        db = self.mongodb_client.get_default_database()
+        collection = db["punishments"]
+        if utils.is_punished(collection, member, "ban"):
+            await self.ban(member.server, member)
+            return
+        if utils.is_punished(collection, member, "warning"):
+            await self.add_roles(
+                member, discord.utils.get(member.server.roles, name="Warned"))
+        if utils.is_punished(collection, member, "mute"):
+            await self.add_roles(
+                member, discord.utils.get(member.server.roles, name="Muted"))
 
     async def on_message(self, message):
         # TODO: logging
