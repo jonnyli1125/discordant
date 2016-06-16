@@ -566,7 +566,6 @@ async def _ban(self, args, message):
         await self.send_message(message.channel,
                                 "Cannot ban another moderator.")
         return
-    await self.ban(user)
     db = self.mongodb_client.get_default_database()
     collection = db["punishments"]
     if utils.is_punished(collection, user, "ban"):
@@ -585,4 +584,5 @@ async def _ban(self, args, message):
     await self.send_message(
         self.get_channel(self.config["moderation"]["log_channel"]),
         _punishment_format(message, document))
+    await self.ban(user)
 #endregion
