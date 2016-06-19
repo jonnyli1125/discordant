@@ -84,10 +84,13 @@ class Discordant(discord.Client):
         cursor.reverse()
         server = self.get_channel(
             self.config["moderation"]["log_channel"]).server
-        for document in [x for x in cursor if x["action"] != "ban" and
-                         not x["action"].startswith("removed")]:
-            member = server.get_member(document["user_id"])
+        for document in cursor:
             action = document["action"]
+            if action == "ban" or action.startswith("removed"):
+                continue
+            member = server.get_member(document["user_id"])
+            if member is None:
+                continue
             if utils.is_punished(collection, member, action):
                 await self.add_punishment_timer(member, action)
 
