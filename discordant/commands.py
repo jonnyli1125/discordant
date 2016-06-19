@@ -197,7 +197,7 @@ async def _dict_search_args_parse(self, args, message, cmd):
     result = re.match(r"^([0-9]+)\s+(.*)$", args)
     if result:
         limit, query = [result.group(x) for x in (1, 2)]
-    return limit, query
+    return int(limit), query
     # keys = ["limit"]
     # kwargs = utils.get_kwargs(args, keys)
     # try:
@@ -211,7 +211,10 @@ async def _dict_search_args_parse(self, args, message, cmd):
 
 @Discordant.register_command("jisho")
 async def _jisho_search(self, args, message):
-    limit, query = await _dict_search_args_parse(self, args, message, "jisho")
+    search_args = await _dict_search_args_parse(self, args, message, "jisho")
+    if not search_args:
+        return
+    limit, query = search_args
     base_req_url = "http://jisho.org/api/v1/search/words"
     # for some reason, requests.get does not encode the url properly, if i use
     # it with the second parameter as a dict.
@@ -222,7 +225,7 @@ async def _jisho_search(self, args, message):
                                 res.status_code, '-', res.reason)
         return
 
-    results = res.json()["data"][:int(limit)]
+    results = res.json()["data"][:limit]
     if not results:
         sent = await self.send_message(message.channel, "No results found.")
         if message.server is not None:
@@ -267,13 +270,16 @@ async def _jisho_search(self, args, message):
                 [display_word(x, "{reading}", "{word} ({reading})") for x in
                  japanese[1:]]) + "\n"
         # output += "\n"
-    for msg in utils.long_message(output, message.server is not None):
-        await self.send_message(message.channel, msg)
+    await utils.send_long_message(
+        self, message.channel, output, message.server is not None)
 
 
 @Discordant.register_command("alc")
 async def _alc_search(self, args, message):
-    limit, query = await _dict_search_args_parse(self, args, message, "alc")
+    search_args = await _dict_search_args_parse(self, args, message, "alc")
+    if not search_args:
+        return
+    limit, query = search_args
     base_req_url = "http://eow.alc.co.jp/search"
     res = requests.get(base_req_url + "?q=" + urllib.parse.quote(
         query, encoding="utf-8"))
@@ -284,7 +290,7 @@ async def _alc_search(self, args, message):
 
     output = ""
     tree = html.fromstring(res.content)
-    results = tree.xpath('//div[@id="resultsList"]/ul/li')[:int(limit)]
+    results = tree.xpath('//div[@id="resultsList"]/ul/li')[:limit]
     if not results:
         sent = await self.send_message(message.channel, "No results found.")
         if message.server is not None:
@@ -323,8 +329,8 @@ async def _alc_search(self, args, message):
         # cheap ass fuckers dont actually give 文例's
         # also removes kana things
         output = re.sub(r"(｛[^｝]*｝)|(【文例】)", "", output.strip()) + "\n"
-    for msg in utils.long_message(output, message.server is not None):
-        await self.send_message(message.channel, msg)
+    await utils.send_long_message(
+        self, message.channel, output, message.server is not None)
 #endregion
 
 
@@ -439,7 +445,6 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
         return
     reason = utils.get_from_kwargs("reason", kwargs, "No reason given.")
     role = discord.utils.get(message.server.roles, name=role_name)
-    await self.add_roles(user, role)
     db = self.mongodb_client.get_default_database()
     collection = db["punishments"]
     if utils.is_punished(collection, user, action):
@@ -473,6 +478,7 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
         "reason": reason
     }
     collection.insert_one(document)
+    await self.add_roles(user, role)
     await self.add_punishment_timer(user, action)
     await self.send_message(
         self.get_channel(self.config["moderation"]["log_channel"]),
@@ -494,7 +500,7 @@ async def _mod_remove_cmd(self, args, message, cmd, action, role_name):
         await self.send_message(message.channel,
                                 "Do not use this command from PM.")
         return
-    if not [x for x in message.author.roles if x.permissions.manage_roles]:
+    if not utils.has_permission(message.author, "manage_roles"):
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
@@ -508,7 +514,6 @@ async def _mod_remove_cmd(self, args, message, cmd, action, role_name):
         await self.send_message(message.channel, "User could not be found.")
         return
     role = discord.utils.get(message.server.roles, name=role_name)
-    await self.remove_roles(user, role)
     db = self.mongodb_client.get_default_database()
     collection = db["punishments"]
     orig_action = action.replace("remove ", "")
@@ -549,7 +554,7 @@ async def _ban(self, args, message):
         await self.send_message(message.channel,
                                 "Do not use this command from PM.")
         return
-    if not [x for x in message.author.roles if x.permissions.ban_members]:
+    if not utils.has_permission(message.author, "ban_members"):
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
@@ -584,5 +589,5 @@ async def _ban(self, args, message):
     await self.send_message(
         self.get_channel(self.config["moderation"]["log_channel"]),
         _punishment_format(message, document))
-    await self.ban(user)
+    await self.ban(user)  # run after the output or else user data is lost
 #endregion

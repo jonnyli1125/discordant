@@ -21,6 +21,11 @@ def long_message(output, truncate=False, max_lines=15):
         if truncate and output.count("\n") > max_lines \
         else split_every(output, 2000)
 
+async def send_long_message(self, channel, message, truncate=False,
+                            max_lines=15):
+    for msg in long_message(message, truncate, max_lines):
+        await self.send_message(channel, msg)
+
 
 def get_kwargs(args_str, keys=None):
     return dict(
