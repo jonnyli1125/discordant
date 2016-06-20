@@ -17,20 +17,21 @@ from .discordant import Discordant
 #region general
 @Discordant.register_command("help")
 async def _help(self, args, message):
+    section = args
     default = "general"
-    if not args:
-        args = default
+    if not section:
+        section = default
     cmds = [cmd.aliases[0] for cmd in self._commands.values()
-            if cmd.section.lower() == args.lower()]
+            if cmd.section == section]
+    output = ""
     if cmds:
-        await self.send_message(message.channel, "Commands: " + ", ".join(cmds))
-    else:
+        output += "Commands: " + ", ".join(cmds) + "\n"
+    if not args or not cmds:
         sections = list({cmd.section + (" *(default)*"
                         if cmd.section == default else "")
                         for cmd in self._commands.values()})
-        await self.send_message(
-            message.channel,
-            "!help [section]\nSections: " + ", ".join(sections))
+        output += "!help [section]\nSections: " + ", ".join(sections)
+    await self.send_message(message.channel, output.strip())
 
 
 @Discordant.register_command("timezone")
