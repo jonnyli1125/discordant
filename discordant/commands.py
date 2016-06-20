@@ -4,9 +4,9 @@ import re
 import urllib.parse
 from datetime import datetime
 
+import aiohttp
 import discord.game
 import pytz
-import requests
 from lxml import html
 from pytz import timezone
 
@@ -14,126 +14,23 @@ import discordant.utils as utils
 from .discordant import Discordant
 
 
-#region other
-# @Discordant.register_handler(r'\bayy+$', re.I)
-async def _ayy_lmao(self, match, message):
-    await self.send_message(message.channel, 'lmao')
-
-
-# @Discordant.register_command('youtube')
-async def _youtube_search(self, args, message):
-    base_req_url = 'https://www.googleapis.com/youtube/v3/search'
-    req_args = {
-        'key': self.config['api-keys']['youtube'],
-        'part': 'snippet',
-        'type': 'video',
-        'maxResults': 1,
-        'q': args
-    }
-
-    res = requests.get(base_req_url, req_args)
-    if not res.ok:
-        await self.send_message(message.channel, 'Error:',
-                                res.status_code, '-', res.reason)
-        return
-
-    json = res.json()
-    if json['pageInfo']['totalResults'] == 0:
-        await self.send_message(message.channel, 'No results found.')
-    else:
-        await self.send_message(message.channel, 'https://youtu.be/' +
-                                json['items'][0]['id']['videoId'])
-
-
-# @Discordant.register_command('urban')
-async def _urban_dictionary_search(self, args, message):
-    # this entire function is an egregious violation of the DRY
-    # principle, so TODO: abstract out the request part of these functions
-    base_req_url = 'http://api.urbandictionary.com/v0/define'
-
-    res = requests.get(base_req_url, {'term': args})
-    if not res.ok:
-        await self.send_message(message.channel, 'Error:',
-                                res.status_code, '-', res.reason)
-        return
-
-    json = res.json()
-    if json['result_type'] == 'no_results':
-        await self.send_message(message.channel, 'No results found.')
-    else:
-        entry = json['list'][0]
-        definition = re.sub(r'\[(\w+)\]', '\\1', entry['definition'])
-
-        reply = ''
-        reply += definition[:1000].strip()
-        if len(definition) > 1000:
-            reply += '... (Definition truncated. '
-            reply += 'See more at <{}>)'.format(entry['permalink'])
-        reply += '\n\n{} :+1: :black_small_square: {} :-1:'.format(
-            entry['thumbs_up'], entry['thumbs_down'])
-        reply += '\n\nSee more results at <{}>'.format(
-            re.sub(r'/\d*$', '', entry['permalink']))
-
-        await self.send_message(message.channel, reply)
-
-
-_memos = {}
-
-
-# @Discordant.register_command('remember')
-async def _remember(self, args, message):
-    global _memos
-
-    key, *memo = args.split()
-    if len(memo) == 0:
-        if key in _memos:
-            del _memos[key]
-            await self.send_message(message.channel, 'Forgot ' + key + '.')
-        else:
-            await self.send_message(message.channel,
-                                    'Nothing given to remember.')
-        return
-
-    memo = args[len(key):].strip()
-    _memos[key] = memo
-    await self.send_message(
-        message.channel,
-        "Remembered message '{}' for key '{}'.".format(memo, key))
-
-
-# @Discordant.register_command('recall')
-async def _recall(self, args, message):
-    global _memos
-    if args not in _memos:
-        await self.send_message(message.channel,
-                                'Nothing currently remembered for', args + '.')
-        return
-
-    await self.send_message(message.channel, _memos[args])
-
-
-# @Discordant.register_command('sleep')
-async def _sleep(self, args, message):
-    await asyncio.sleep(5)
-    await self.send_message(message.channel, 'done sleeping')
-
-
-# @Discordant.register_command('exit')
-async def _exit(self, args, message):
-    import sys
-    sys.exit()
-#endregion
-
-
 #region general
 @Discordant.register_command("help")
 async def _help(self, args, message):
+    default = "general"
     if not args:
-        args = "general"
-    cmds = [self._commands[x].aliases[0] for x in self._commands
-            if self._commands[x].section.lower() == args.lower()]
-    await self.send_message(
-        message.channel, "Commands: " + ", ".join(cmds) if cmds else "*none*")
+        args = default
+    cmds = [cmd.aliases[0] for cmd in self._commands.values()
+            if cmd.section.lower() == args.lower()]
+    if cmds:
+        await self.send_message(message.channel, "Commands: " + ", ".join(cmds))
+    else:
+        sections = list({cmd.section + (" *(default)*"
+                        if cmd.section == default else "")
+                        for cmd in self._commands.values()})
+        await self.send_message(
+            message.channel,
+            "!help <section>\nSections: " + ", ".join(sections))
 
 
 @Discordant.register_command("timezone")
@@ -215,17 +112,16 @@ async def _jisho_search(self, args, message):
     if not search_args:
         return
     limit, query = search_args
-    base_req_url = "http://jisho.org/api/v1/search/words"
-    # for some reason, requests.get does not encode the url properly, if i use
-    # it with the second parameter as a dict.
-    res = requests.get(base_req_url + "?keyword=" + urllib.parse.quote(
-        query, encoding="utf-8"))
-    if not res.ok:
-        await self.send_message(message.channel, 'Error: ',
-                                res.status_code, '-', res.reason)
+    url = "http://jisho.org/api/v1/search/words?keyword=" + \
+          urllib.parse.quote(query, encoding="utf-8")
+    try:
+        with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                data = await response.json()
+    except Exception as e:
+        await self.send_message(message.channel, "Request failed: " + str(e))
         return
-
-    results = res.json()["data"][:limit]
+    results = data["data"][:limit]
     if not results:
         sent = await self.send_message(message.channel, "No results found.")
         if message.server is not None:
@@ -280,16 +176,17 @@ async def _alc_search(self, args, message):
     if not search_args:
         return
     limit, query = search_args
-    base_req_url = "http://eow.alc.co.jp/search"
-    res = requests.get(base_req_url + "?q=" + urllib.parse.quote(
-        query, encoding="utf-8"))
-    if not res.ok:
-        await self.send_message(message.channel, 'Error: ',
-                                res.status_code, '-', res.reason)
+    url = "http://eow.alc.co.jp/search?q=" + \
+          urllib.parse.quote(query, encoding="utf-8")
+    try:
+        with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                data = await response.text()
+    except Exception as e:
+        await self.send_message(message.channel, "Request failed: " + str(e))
         return
-
     output = ""
-    tree = html.fromstring(res.content)
+    tree = html.fromstring(data)
     results = tree.xpath('//div[@id="resultsList"]/ul/li')[:limit]
     if not results:
         sent = await self.send_message(message.channel, "No results found.")
@@ -350,8 +247,14 @@ async def _client_settings(self, args, message):
         del kwargs["game"]
     if "avatar" in kwargs:
         if utils.is_url(kwargs["avatar"]):
-            kwargs["avatar"] = requests.get(
-                kwargs["avatar"], stream=True).raw.read()
+            try:
+                with aiohttp.ClientSession() as session:
+                    async with session.get(kwargs["avatar"]) as response:
+                        kwargs["avatar"] = await response.read()
+            except Exception as e:
+                await self.send_message(message.channel,
+                                        "Request failed: " + str(e))
+                return
         elif os.path.isfile(kwargs["avatar"]):
             kwargs["avatar"] = open(kwargs["avatar"], "rb").read()
         else:
