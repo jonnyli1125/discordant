@@ -263,6 +263,32 @@ async def _client_settings(self, args, message):
             return
     await self.edit_profile(self._password, **kwargs)
     await self.send_message(message.channel, "Settings updated.")
+
+
+@Discordant.register_command("showvc", section="bot")
+async def _show_voice_channels_toggle(self, args, message):
+    db = self.mongodb_client.get_default_database()
+    collection = db["always_show_vc"]
+    query = {"user_id": message.author.id}
+    cursor = list(collection.find(query))
+    if not cursor:
+        show = True
+        collection.insert({"user_id": message.author.id, "value": show})
+    else:
+        show = not cursor[0]["value"]
+        collection.update(query, {"$set": {"value": show}})
+    role = discord.utils.get(message.server.roles, name="VC Shown")
+    if show:
+        await self.add_roles(message.author, role)
+        await self.send_message(
+            message.channel,
+            "Now always showing voice channels." +
+            "Type this command again to toggle.")
+    else:
+        await self.remove_roles(message.author, role)
+        await self.send_message(
+            message.channel,
+            "Now hiding voice channels. Type this command again to toggle.")
 #endregion
 
 

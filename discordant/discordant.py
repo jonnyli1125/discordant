@@ -44,7 +44,6 @@ class Discordant(discord.Client):
 
     def load_config(self, config_file):
         if utils.is_url(config_file):
-
             async def f():
                 nonlocal config_file
                 with aiohttp.ClientSession() as session:
@@ -140,6 +139,21 @@ class Discordant(discord.Client):
         if utils.is_punished(collection, member, "mute"):
             await self.add_roles(
                 member, discord.utils.get(member.server.roles, name="Muted"))
+
+    async def on_voice_state_update(self, before, after):
+        async def update_voice_roles(member, role_name):
+            in_voice = member.voice_channel is not None
+            role = discord.utils.get(member.server.roles, name=role_name)
+            await getattr(
+                self,
+                ("add" if in_voice else "remove") + "_roles")(member, role)
+
+        await update_voice_roles(after, "Voice")
+        db = self.mongodb_client.get_default_database()
+        collection = db["always_show_vc"]
+        cursor = list(collection.find({"user_id": after.id}))
+        if not cursor or not cursor[0]["value"]:
+            await update_voice_roles(after, "VC Shown")
 
     async def on_message(self, message):
         # TODO: logging
