@@ -126,8 +126,7 @@ async def _jisho_search(self, args, message):
     if not results:
         sent = await self.send_message(message.channel, "No results found.")
         if message.server is not None:
-            await asyncio.sleep(5)
-            await self.delete_message(sent)
+            await _delete_after(self, 5, message, sent)
         return
     output = ""
 
@@ -192,8 +191,7 @@ async def _alc_search(self, args, message):
     if not results:
         sent = await self.send_message(message.channel, "No results found.")
         if message.server is not None:
-            await asyncio.sleep(5)
-            await self.delete_message(sent)
+            await _delete_after(self, 5, message, sent)
         return
     for result in results:
         words = [x for x in result.xpath('./span') if
@@ -266,6 +264,12 @@ async def _client_settings(self, args, message):
     await self.send_message(message.channel, "Settings updated.")
 
 
+async def _delete_after(self, time, *args):
+    await asyncio.sleep(time)
+    for msg in args:
+        await self.delete_message(msg)
+
+
 @Discordant.register_command("showvc", section="bot")
 async def _show_voice_channels_toggle(self, args, message):
     db = self.mongodb_client.get_default_database()
@@ -279,17 +283,21 @@ async def _show_voice_channels_toggle(self, args, message):
         show = not cursor[0]["value"]
         collection.update(query, {"$set": {"value": show}})
     role = discord.utils.get(message.server.roles, name="VC Shown")
+
     if show:
         await self.add_roles(message.author, role)
-        await self.send_message(
+        msg = await self.send_message(
             message.channel,
-            "Now always showing voice channels." +
-            "Type this command again to toggle.")
+            "Now always showing voice channels for " + message.author.name +
+            ". Type this command again to toggle.")
     else:
         await self.remove_roles(message.author, role)
-        await self.send_message(
+        msg = await self.send_message(
             message.channel,
-            "Now hiding voice channels. Type this command again to toggle.")
+            "Now hiding voice channels for " + message.author.name +
+            ". Type this command again to toggle.")
+    if message.server is not None:
+        await _delete_after(self, 5, message, msg)
 #endregion
 
 
