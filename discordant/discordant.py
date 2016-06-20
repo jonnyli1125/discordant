@@ -7,9 +7,9 @@ from collections import namedtuple
 from inspect import iscoroutinefunction
 from os import path
 
+import aiohttp
 import discord
 import pymongo
-import requests
 
 import discordant.utils as utils
 
@@ -44,7 +44,14 @@ class Discordant(discord.Client):
 
     def load_config(self, config_file):
         if utils.is_url(config_file):
-            self.config = requests.get(config_file).json()
+
+            async def f():
+                nonlocal config_file
+                with aiohttp.ClientSession() as session:
+                    async with session.get(config_file) as response:
+                        self.config = await response.json()
+
+            asyncio.get_event_loop().run_until_complete(f())
         elif not path.exists(config_file):
             print("No config file found (expected '{}').".format(config_file))
             print("Copy config-example.json to", config_file,
@@ -77,7 +84,9 @@ class Discordant(discord.Client):
         await self.change_status(
             game=discord.Game(name=self.config["client"]["game"])
             if self.config["client"]["game"] else None)
+        await self.load_punishment_timers()
 
+    async def load_punishment_timers(self):
         db = self.mongodb_client.get_default_database()
         collection = db["punishments"]
         cursor = list(collection.find())

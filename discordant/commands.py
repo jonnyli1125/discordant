@@ -30,7 +30,7 @@ async def _help(self, args, message):
                         for cmd in self._commands.values()})
         await self.send_message(
             message.channel,
-            "!help <section>\nSections: " + ", ".join(sections))
+            "!help [section]\nSections: " + ", ".join(sections))
 
 
 @Discordant.register_command("timezone")
