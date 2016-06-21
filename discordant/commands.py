@@ -507,20 +507,23 @@ async def _ban(self, args, message):
     if user is None:
         await self.send_message(
             message.channel,
-            "User could not be found.\n" +
-            "Please enter a user ID, or type \"n\" to cancel.")
-        reply = await self.wait_for_message(author=message.author, timeout=60)
+            "User could not be found.\nIf this is a user ID, type y/n.")
+        reply = await self.wait_for_message(
+            check=lambda m: m.author == message.author and
+                            (m.content.lower() == "y" or
+                             m.content.lower() == "n"),
+            timeout=60)
         if reply is None or reply.content.lower() == "n":
             await self.send_message(message.channel, "Cancelled ban.")
             return
         else:
-            user_id = reply.content
+            user_id = user_search
     else:
+        if utils.has_permission(user, "ban_members"):
+            await self.send_message(message.channel,
+                                    "Cannot ban another moderator.")
+            return
         user_id = user.id
-    if utils.has_permission(user, "ban_members"):
-        await self.send_message(message.channel,
-                                "Cannot ban another moderator.")
-        return
     db = self.mongodb_client.get_default_database()
     collection = db["punishments"]
     if utils.is_punished(collection, user, "ban"):
