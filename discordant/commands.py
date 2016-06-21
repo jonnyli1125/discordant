@@ -526,9 +526,10 @@ async def _ban(self, args, message):
         user_id = user.id
     db = self.mongodb_client.get_default_database()
     collection = db["punishments"]
-    if utils.is_punished(collection, user, "ban"):
+    cursor = list(collection.find({"user_id": user_id, "action": "ban"}))
+    if cursor:
         await self.send_message(
-            message.channel, user.name + " has no active ban.")
+            message.channel, user.name + " is already banned.")
         return
     document = {
         "user_id": user_id,
