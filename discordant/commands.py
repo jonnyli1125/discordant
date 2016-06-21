@@ -293,7 +293,8 @@ async def _show_voice_channels_toggle(self, args, message):
             "Now always showing voice channels for " + message.author.name +
             ". Type this command again to toggle.")
     else:
-        await self.remove_roles(member, role)
+        if not member.voice_channel:
+            await self.remove_roles(member, role)
         msg = await self.send_message(
             message.channel,
             "Now hiding voice channels for " + message.author.name +
@@ -307,8 +308,10 @@ async def _show_voice_channels_toggle(self, args, message):
 def _punishment_format(self, message, document):
     server = message.server if message.server else self.default_server
     if "user" not in document:
-        user = server.get_member(document["user_id"])
-        document["user"] = user.name + "#" + user.discriminator
+        user_id = document["user_id"]
+        user = server.get_member(user_id)
+        document["user"] = user.name + "#" + user.discriminator \
+            if user else user_id
     if "moderator" not in document:
         moderator = server.get_member(document["moderator_id"])
         document["moderator"] = moderator.name + "#" + moderator.discriminator
@@ -502,8 +505,18 @@ async def _ban(self, args, message):
     reason = args[len(user_search) + 1:] if " " in args else "No reason given."
     user = utils.get_user(user_search, server.members)
     if user is None:
-        await self.send_message(message.channel, "User could not be found.")
-        return
+        await self.send_message(
+            message.channel,
+            "User could not be found.\n" +
+            "Please enter a user ID, or type \"n\" to cancel.")
+        reply = await self.wait_for_message(author=message.author, timeout=60)
+        if reply is None or reply.content.lower() == "n":
+            await self.send_message(message.channel, "Cancelled ban.")
+            return
+        else:
+            user_id = reply.content
+    else:
+        user_id = user.id
     if utils.has_permission(user, "ban_members"):
         await self.send_message(message.channel,
                                 "Cannot ban another moderator.")
@@ -515,7 +528,7 @@ async def _ban(self, args, message):
             message.channel, user.name + " has no active ban.")
         return
     document = {
-        "user_id": user.id,
+        "user_id": user_id,
         "action": "ban",
         "moderator_id": message.author.id,
         "date": datetime.utcnow(),
