@@ -125,7 +125,7 @@ async def _jisho_search(self, args, message):
     results = data["data"][:limit]
     if not results:
         sent = await self.send_message(message.channel, "No results found.")
-        if message.server is not None:
+        if message.server:
             await _delete_after(self, 5, message, sent)
         return
     output = ""
@@ -190,7 +190,7 @@ async def _alc_search(self, args, message):
     results = tree.xpath('//div[@id="resultsList"]/ul/li')[:limit]
     if not results:
         sent = await self.send_message(message.channel, "No results found.")
-        if message.server is not None:
+        if message.server:
             await _delete_after(self, 5, message, sent)
         return
     for result in results:
@@ -282,32 +282,35 @@ async def _show_voice_channels_toggle(self, args, message):
     else:
         show = not cursor[0]["value"]
         collection.update(query, {"$set": {"value": show}})
-    role = discord.utils.get(message.server.roles, name="VC Shown")
+    role = discord.utils.get(self.default_server.roles, name="VC Shown")
 
+    member = message.author if message.server \
+        else self.default_server.get_member(message.author.id)
     if show:
-        await self.add_roles(message.author, role)
+        await self.add_roles(member, role)
         msg = await self.send_message(
             message.channel,
             "Now always showing voice channels for " + message.author.name +
             ". Type this command again to toggle.")
     else:
-        await self.remove_roles(message.author, role)
+        await self.remove_roles(member, role)
         msg = await self.send_message(
             message.channel,
             "Now hiding voice channels for " + message.author.name +
             ". Type this command again to toggle.")
-    if message.server is not None:
+    if message.server:
         await _delete_after(self, 5, message, msg)
 #endregion
 
 
 #region moderation
-def _punishment_format(message, document):
+def _punishment_format(self, message, document):
+    server = message.server if message.server else self.default_server
     if "user" not in document:
-        user = message.server.get_member(document["user_id"])
+        user = server.get_member(document["user_id"])
         document["user"] = user.name + "#" + user.discriminator
     if "moderator" not in document:
-        moderator = message.server.get_member(document["moderator_id"])
+        moderator = server.get_member(document["moderator_id"])
         document["moderator"] = moderator.name + "#" + moderator.discriminator
     document["date"] = document["date"].strftime("%Y/%m/%d %I:%M %p UTC")
     document["duration"] = "indefinite" \
@@ -322,8 +325,9 @@ def _punishment_format(message, document):
         **document)
 
 
-def _punishment_history(message, cursor):
-    return "\n".join(reversed([_punishment_format(message, x) for x in cursor]))
+def _punishment_history(self, message, cursor):
+    return "\n".join(
+        reversed([_punishment_format(self, message, x) for x in cursor]))
 
 
 @Discordant.register_command("modhistory", section="mod")
@@ -331,24 +335,25 @@ async def _moderation_history(self, args, message):
     if not args:
         await self.send_message(message.channel, "!modhistory <user>")
         return
-    user = utils.get_user(args, message.server.members)
+    server = message.server if message.server else self.default_server
+    user = utils.get_user(args, server.members)
+    if user is None:
+        await self.send_message(message.channel, "User could not be found.")
+        return
     db = self.mongodb_client.get_default_database()
     collection = db["punishments"]
     cursor = list(collection.find({"user_id": user.id}))
     cursor.reverse()
     if cursor:
         await self.send_message(
-            message.channel, _punishment_history(message, cursor))
+            message.channel, _punishment_history(self, message, cursor))
     else:
         await self.send_message(
             message.channel, user.name + " has no punishment history.")
 
 
 async def _mod_cmd(self, args, message, cmd, action, role_name):
-    if message.server is None:
-        await self.send_message(message.channel,
-                                "Do not use this command from PM.")
-        return
+    server = message.server if message.server else self.default_server
     if not utils.has_permission(message.author, "manage_roles"):
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
@@ -366,7 +371,7 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
         args = args[:i] + 'reason="' + args[i:] + '"'
         kwargs = utils.get_kwargs(args, keys)
     user_search = utils.strip_kwargs(args, keys)
-    user = utils.get_user(user_search, message.server.members)
+    user = utils.get_user(user_search, server.members)
     if user is None:
         await self.send_message(message.channel, "User could not be found.")
         return
@@ -382,7 +387,7 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
         await self.send_message(message.channel, "Invalid duration.")
         return
     reason = utils.get_from_kwargs("reason", kwargs, "No reason given.")
-    role = discord.utils.get(message.server.roles, name=role_name)
+    role = discord.utils.get(server.roles, name=role_name)
     db = self.mongodb_client.get_default_database()
     collection = db["punishments"]
     if utils.is_punished(collection, user, action):
@@ -397,7 +402,7 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
             await self.send_message(
                 message.channel,
                 user.name + " has a history of:\n" + _punishment_history(
-                    message, cursor) + "\n\nType y/n to continue.")
+                    self, message, cursor) + "\n\nType y/n to continue.")
             reply = await self.wait_for_message(
                 check=lambda m: m.author == message.author and
                                 (m.content.lower() == "y" or
@@ -420,7 +425,7 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
     await self.add_punishment_timer(user, action)
     await self.send_message(
         self.get_channel(self.config["moderation"]["log_channel"]),
-        _punishment_format(message, document))
+        _punishment_format(self, message, document))
 
 
 @Discordant.register_command("warn", section="mod")
@@ -434,10 +439,7 @@ async def _mute(self, args, message):
 
 
 async def _mod_remove_cmd(self, args, message, cmd, action, role_name):
-    if message.server is None:
-        await self.send_message(message.channel,
-                                "Do not use this command from PM.")
-        return
+    server = message.server if message.server else self.default_server
     if not utils.has_permission(message.author, "manage_roles"):
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
@@ -447,11 +449,11 @@ async def _mod_remove_cmd(self, args, message, cmd, action, role_name):
         return
     user_search = args.split()[0]
     reason = args[len(user_search) + 1:] if " " in args else "No reason given."
-    user = utils.get_user(user_search, message.server.members)
+    user = utils.get_user(user_search, server.members)
     if user is None:
         await self.send_message(message.channel, "User could not be found.")
         return
-    role = discord.utils.get(message.server.roles, name=role_name)
+    role = discord.utils.get(server.roles, name=role_name)
     db = self.mongodb_client.get_default_database()
     collection = db["punishments"]
     orig_action = action.replace("remove ", "")
@@ -471,7 +473,7 @@ async def _mod_remove_cmd(self, args, message, cmd, action, role_name):
     await self.remove_roles(user, role)
     await self.send_message(
         self.get_channel(self.config["moderation"]["log_channel"]),
-        _punishment_format(message, document))
+        _punishment_format(self, message, document))
 
 
 @Discordant.register_command("unwarn", section="mod")
@@ -488,10 +490,7 @@ async def _unmute(self, args, message):
 
 @Discordant.register_command("ban", section="mod")
 async def _ban(self, args, message):
-    if message.server is None:
-        await self.send_message(message.channel,
-                                "Do not use this command from PM.")
-        return
+    server = message.server if message.server else self.default_server
     if not utils.has_permission(message.author, "ban_members"):
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
@@ -501,7 +500,7 @@ async def _ban(self, args, message):
         return
     user_search = args.split()[0]
     reason = args[len(user_search) + 1:] if " " in args else "No reason given."
-    user = utils.get_user(user_search, message.server.members)
+    user = utils.get_user(user_search, server.members)
     if user is None:
         await self.send_message(message.channel, "User could not be found.")
         return
@@ -526,6 +525,6 @@ async def _ban(self, args, message):
     collection.insert_one(document)
     await self.send_message(
         self.get_channel(self.config["moderation"]["log_channel"]),
-        _punishment_format(message, document))
+        _punishment_format(self, message, document))
     await self.ban(user)  # run after the output or else user data is lost
 #endregion

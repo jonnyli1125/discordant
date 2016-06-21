@@ -33,6 +33,7 @@ class Discordant(discord.Client):
         self.controllers = []
         self.mongodb_client = None
         self.config = {}
+        self.default_server = None
 
         self.load_config(config_file)
 
@@ -83,6 +84,8 @@ class Discordant(discord.Client):
         await self.change_status(
             game=discord.Game(name=self.config["client"]["game"])
             if self.config["client"]["game"] else None)
+        self.default_server = self.get_channel(
+            self.config["moderation"]["log_channel"]).server
         await self.load_punishment_timers()
 
     async def load_punishment_timers(self):
@@ -90,13 +93,11 @@ class Discordant(discord.Client):
         collection = db["punishments"]
         cursor = list(collection.find())
         cursor.reverse()
-        server = self.get_channel(
-            self.config["moderation"]["log_channel"]).server
         for document in cursor:
             action = document["action"]
             if action == "ban" or action.startswith("removed"):
                 continue
-            member = server.get_member(document["user_id"])
+            member = self.default_server.get_member(document["user_id"])
             if member is None:
                 continue
             if utils.is_punished(collection, member, action):
@@ -140,20 +141,22 @@ class Discordant(discord.Client):
             await self.add_roles(
                 member, discord.utils.get(member.server.roles, name="Muted"))
 
-    async def on_voice_state_update(self, before, after):
-        async def update_voice_roles(member, role_name):
-            in_voice = member.voice_channel is not None
-            role = discord.utils.get(member.server.roles, name=role_name)
-            await getattr(
-                self,
-                ("add" if in_voice else "remove") + "_roles")(member, role)
+    async def _update_voice_roles(self, member, role_name):
+        role = discord.utils.get(member.server.roles, name=role_name)
+        f_name = ("add" if member.voice_channel else "remove") + "_roles"
+        await getattr(self, f_name)(member, role)
 
-        await update_voice_roles(after, "Voice")
+    async def on_voice_state_update(self, before, after):
+        await self._update_voice_roles(after, "Voice")
         db = self.mongodb_client.get_default_database()
         collection = db["always_show_vc"]
         cursor = list(collection.find({"user_id": after.id}))
         if not cursor or not cursor[0]["value"]:
-            await update_voice_roles(after, "VC Shown")
+            await self._update_voice_roles(after, "VC Shown")
+
+    async def on_member_update(self, before, after):
+        if bool(before.voice_channel) != bool(after.voice_channel):
+            await self._update_voice_roles(after, "Voice")
 
     async def on_message(self, message):
         # TODO: logging
