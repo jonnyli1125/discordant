@@ -131,14 +131,15 @@ async def _jisho_search(self, args, message):
     output = ""
 
     def display_word(obj, *formats):
-        return formats[len(obj) - 1].format(**obj)
+        f = formats[len(obj) - 1]
+        return f.format(*obj.values()) if len(obj) == 1 else f.format(**obj)
 
     for result in results:
         japanese = result["japanese"]
-        output += display_word(japanese[0], "**{reading}**",
+        output += display_word(japanese[0], "**{}**",
                                "**{word}** {reading}") + "\n"
         new_line = ""
-        if result["is_common"]:
+        if "is_common" in result and result["is_common"]:
             new_line += "Common word. "
         if result["tags"]:  # it doesn't show jlpt tags, only wk tags?
             new_line += "Wanikani level " + ", ".join(
@@ -149,7 +150,7 @@ async def _jisho_search(self, args, message):
         for index, sense in enumerate(senses):
             # jisho returns null sometimes for some parts of speech... k den
             parts = [x for x in sense["parts_of_speech"] if x is not None]
-            if parts == ["Wikipedia definition"]:
+            if parts == ["Wikipedia definition"] and len(senses) > 1:
                 continue
             if parts:
                 output += "*" + ", ".join(parts) + "*\n"
@@ -161,9 +162,11 @@ async def _jisho_search(self, args, message):
             if sense["see_also"]:
                 output += ". *See also*: " + ", ".join(sense["see_also"])
             output += "\n"
+            output += "\n".join(
+                ["{text}: {url}".format(**x) for x in sense["links"]])
         if len(japanese) > 1:
             output += "Other forms: " + ", ".join(
-                [display_word(x, "{reading}", "{word} ({reading})") for x in
+                [display_word(x, "{}", "{word} ({reading})") for x in
                  japanese[1:]]) + "\n"
         # output += "\n"
     await utils.send_long_message(
