@@ -87,17 +87,7 @@ class Discordant(discord.Client):
         self.default_server = self.get_channel(
             self.config["moderation"]["log_channel"]).server
         await self.load_punishment_timers()
-        voice_role = discord.utils.get(self.default_server.roles, name="Voice")
-        for member in [x for x in self.default_server.members
-                       if x.voice_channel or voice_role in x.roles]:
-            await self._update_voice_roles(member, voice_role)
-        cursor = await self.mongodb.always_show_vc.find().to_list(None)
-        for doc in cursor:
-            member = self.default_server.get_member(doc["user_id"])
-            show_vc_role = discord.utils.get(
-                self.default_server.roles, name="VC Shown")
-            f = getattr(self, ("add" if doc["value"] else "remove") + "_roles")
-            await f(member, show_vc_role)
+        await self.load_voice_roles()
 
     async def load_punishment_timers(self):
         cursor = await self.mongodb.punishments.find().to_list(None)
@@ -143,6 +133,21 @@ class Discordant(discord.Client):
         if await utils.is_punished(self, member, "mute"):
             await self.add_roles(
                 member, discord.utils.get(member.server.roles, name="Muted"))
+
+    async def load_voice_roles(self):
+        voice_role = discord.utils.get(self.default_server.roles, name="Voice")
+        for member in [x for x in self.default_server.members
+                       if x.voice_channel or voice_role in x.roles]:
+            await asyncio.sleep(1)  # avoid rate limit
+            await self._update_voice_roles(member, voice_role)
+        cursor = await self.mongodb.always_show_vc.find().to_list(None)
+        for doc in cursor:
+            member = self.default_server.get_member(doc["user_id"])
+            show_vc_role = discord.utils.get(
+                self.default_server.roles, name="VC Shown")
+            f = getattr(self, ("add" if doc["value"] else "remove") + "_roles")
+            await asyncio.sleep(1)
+            await f(member, show_vc_role)
 
     async def _update_voice_roles(self, member, *roles):
         in_voice = bool(member.voice_channel) and \
