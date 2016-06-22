@@ -90,7 +90,7 @@ class Discordant(discord.Client):
         voice_role = discord.utils.get(self.default_server.roles, name="Voice")
         for member in [x for x in self.default_server.members
                        if x.voice_channel or voice_role in x.roles]:
-            await self._update_voice_roles(member)
+            await self._update_voice_roles(member, voice_role)
 
     async def load_punishment_timers(self):
         db = self.mongodb_client.get_default_database()
@@ -145,28 +145,23 @@ class Discordant(discord.Client):
             await self.add_roles(
                 member, discord.utils.get(member.server.roles, name="Muted"))
 
-    async def _update_voice_role(self, member, role_name):
+    async def _update_voice_roles(self, member, *roles):
         in_voice = bool(member.voice_channel) and \
                    member.voice_channel != member.server.afk_channel
-        role = discord.utils.get(member.server.roles, name=role_name)
         f_name = ("add" if in_voice else "remove") + "_roles"
-        await getattr(self, f_name)(member, role)
-
-    async def _update_voice_roles(self, member):
-        await asyncio.sleep(1)  # i wonder if this will work.
-        await self._update_voice_role(member, "Voice")
-        db = self.mongodb_client.get_default_database()
-        collection = db["always_show_vc"]
-        cursor = list(collection.find({"user_id": member.id}))
-        if not cursor or not cursor[0]["value"]:
-            await self._update_voice_role(member, "VC Shown")
+        await getattr(self, f_name)(member, *roles)
 
     async def on_voice_state_update(self, before, after):
         if before.voice_channel != after.voice_channel:
-            await self._update_voice_roles(after)
-
-    async def on_member_update(self, before, after):
-        await self.on_voice_state_update(before, after)
+            roles = [discord.utils.get(after.server.roles, name="Voice")]
+            db = self.mongodb_client.get_default_database()
+            collection = db["always_show_vc"]
+            cursor = list(collection.find({"user_id": after.id}))
+            if not cursor or not cursor[0]["value"]:
+                # discord.py library bug, so prepending to list for now.
+                roles.insert(
+                    0, discord.utils.get(after.server.roles, name="VC Shown"))
+            await self._update_voice_roles(after, *roles)
 
     async def on_message(self, message):
         # TODO: logging
