@@ -91,6 +91,13 @@ class Discordant(discord.Client):
         for member in [x for x in self.default_server.members
                        if x.voice_channel or voice_role in x.roles]:
             await self._update_voice_roles(member, voice_role)
+        cursor = await self.mongodb.always_show_vc.find()
+        for doc in cursor:
+            member = self.default_server.get_member(doc["user_id"])
+            show_vc_role = discord.utils.get(
+                self.default_server.roles, name="VC Shown")
+            f = getattr(self, ("add" if doc["value"] else "remove") + "_roles")
+            await f(member, show_vc_role)
 
     async def load_punishment_timers(self):
         cursor = await self.mongodb.punishments.find().to_list(None)
@@ -140,13 +147,14 @@ class Discordant(discord.Client):
     async def _update_voice_roles(self, member, *roles):
         in_voice = bool(member.voice_channel) and \
                    member.voice_channel != member.server.afk_channel
-        f_name = ("add" if in_voice else "remove") + "_roles"
-        await getattr(self, f_name)(member, *roles)
+        f = getattr(self, ("add" if in_voice else "remove") + "_roles")
+        await f(member, *roles)
 
     async def on_voice_state_update(self, before, after):
         if before.voice_channel != after.voice_channel:
             roles = [discord.utils.get(after.server.roles, name="Voice")]
-            doc = await self.mongodb.always_show_vc.find_one({"user_id": after.id})
+            doc = await self.mongodb.always_show_vc.find_one(
+                {"user_id": after.id})
             if not doc or not doc["value"]:
                 # discord.py library bug, so prepending to list for now.
                 roles.insert(
