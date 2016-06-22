@@ -91,7 +91,7 @@ class Discordant(discord.Client):
         for member in [x for x in self.default_server.members
                        if x.voice_channel or voice_role in x.roles]:
             await self._update_voice_roles(member, voice_role)
-        cursor = await self.mongodb.always_show_vc.find()
+        cursor = await self.mongodb.always_show_vc.find().to_list(None)
         for doc in cursor:
             member = self.default_server.get_member(doc["user_id"])
             show_vc_role = discord.utils.get(
