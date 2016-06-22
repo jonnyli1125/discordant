@@ -146,7 +146,7 @@ class Discordant(discord.Client):
     async def on_voice_state_update(self, before, after):
         if before.voice_channel != after.voice_channel:
             roles = [discord.utils.get(after.server.roles, name="Voice")]
-            doc = await self.mongodb.punishments.find_one({"user_id": after.id})
+            doc = await self.mongodb.always_show_vc.find_one({"user_id": after.id})
             if not doc or not doc["value"]:
                 # discord.py library bug, so prepending to list for now.
                 roles.insert(
