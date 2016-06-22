@@ -159,7 +159,7 @@ async def _jisho_search(self, args, message):
                 if sense[attr]:
                     output += ". *" + "*. *".join(sense[attr]) + "*"
             if sense["see_also"]:
-                output += ". *See also: " + ", ".join(sense["see_also"]) + "*"
+                output += ". *See also*: " + ", ".join(sense["see_also"])
             output += "\n"
         if len(japanese) > 1:
             output += "Other forms: " + ", ".join(
@@ -272,16 +272,15 @@ async def _delete_after(self, time, *args):
 
 @Discordant.register_command("showvc", section="bot")
 async def _show_voice_channels_toggle(self, args, message):
-    db = self.mongodb_client.get_default_database()
-    collection = db["always_show_vc"]
     query = {"user_id": message.author.id}
-    cursor = list(collection.find(query))
+    collection = self.mongodb.always_show_vc
+    cursor = await collection.find(query).to_list(None)
     if not cursor:
         show = True
-        collection.insert({"user_id": message.author.id, "value": show})
+        await collection.insert({"user_id": message.author.id, "value": show})
     else:
         show = not cursor[0]["value"]
-        collection.update(query, {"$set": {"value": show}})
+        await collection.update(query, {"$set": {"value": show}})
     role = discord.utils.get(self.default_server.roles, name="VC Shown")
 
     member = message.author if message.server \
@@ -328,9 +327,9 @@ def _punishment_format(self, message, document):
         **document)
 
 
-def _punishment_history(self, message, cursor):
-    return "\n".join(
-        reversed([_punishment_format(self, message, x) for x in cursor]))
+def _punishment_history(self, message):
+    return "\n".join([_punishment_format(
+        self, message, x) for x in self.mongodb.punishments])
 
 
 @Discordant.register_command("modhistory", section="mod")
@@ -343,13 +342,11 @@ async def _moderation_history(self, args, message):
     if user is None:
         await self.send_message(message.channel, "User could not be found.")
         return
-    db = self.mongodb_client.get_default_database()
-    collection = db["punishments"]
-    cursor = list(collection.find({"user_id": user.id}))
-    cursor.reverse()
+    collection = self.mongodb.punishments
+    cursor = await collection.find({"user_id": user.id}).to_list(None)
     if cursor:
         await self.send_message(
-            message.channel, _punishment_history(self, message, cursor))
+            message.channel, _punishment_history(self, message))
     else:
         await self.send_message(
             message.channel, user.name + " has no punishment history.")
@@ -391,21 +388,19 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
         return
     reason = utils.get_from_kwargs("reason", kwargs, "No reason given.")
     role = discord.utils.get(server.roles, name=role_name)
-    db = self.mongodb_client.get_default_database()
-    collection = db["punishments"]
-    if utils.is_punished(collection, user, action):
+    collection = self.mongodb.punishments
+    if await utils.is_punished(self, user, action):
         await self.send_message(
             message.channel,
             user.name + " already has an active " + action + ".")
         return
     else:
-        cursor = list(collection.find({"user_id": user.id}))
-        cursor.reverse()
+        cursor = await collection.find({"user_id": user.id}).to_list(None)
         if cursor:
             await self.send_message(
                 message.channel,
                 user.name + " has a history of:\n" + _punishment_history(
-                    self, message, cursor) + "\n\nType y/n to continue.")
+                    self, message) + "\n\nType y/n to continue.")
             reply = await self.wait_for_message(
                 check=lambda m: m.author == message.author and
                                 (m.content.lower() == "y" or
@@ -423,7 +418,7 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
         "duration": duration,
         "reason": reason
     }
-    collection.insert_one(document)
+    await collection.insert_one(document)
     await self.add_roles(user, role)
     await self.add_punishment_timer(user, action)
     await self.send_message(
@@ -457,12 +452,11 @@ async def _mod_remove_cmd(self, args, message, cmd, action, role_name):
         await self.send_message(message.channel, "User could not be found.")
         return
     role = discord.utils.get(server.roles, name=role_name)
-    db = self.mongodb_client.get_default_database()
-    collection = db["punishments"]
+    collection = self.mongodb.punishments
     orig_action = action.replace("remove ", "")
-    if not utils.is_punished(collection, user, orig_action):
+    if not await utils.is_punished(self, user, orig_action):
         await self.send_message(
-            message.channel, user.name + " has no active warning.")
+            message.channel, user.name + " has no active " + action + ".")
         return
     document = {
         "user_id": user.id,
@@ -472,7 +466,7 @@ async def _mod_remove_cmd(self, args, message, cmd, action, role_name):
         "duration": 0,
         "reason": reason
     }
-    collection.insert_one(document)
+    await collection.insert_one(document)
     await self.remove_roles(user, role)
     await self.send_message(
         self.get_channel(self.config["moderation"]["log_channel"]),
@@ -524,10 +518,9 @@ async def _ban(self, args, message):
                                     "Cannot ban another moderator.")
             return
         user_id = user.id
-    db = self.mongodb_client.get_default_database()
-    collection = db["punishments"]
-    cursor = list(collection.find({"user_id": user_id, "action": "ban"}))
-    if cursor:
+    collection = self.mongodb.punishments
+    doc = await collection.find_one({"user_id": user_id, "action": "ban"})
+    if doc:
         await self.send_message(
             message.channel, user.name + " is already banned.")
         return
@@ -539,7 +532,7 @@ async def _ban(self, args, message):
         "duration": 0,
         "reason": reason
     }
-    collection.insert_one(document)
+    await collection.insert_one(document)
     await self.send_message(
         self.get_channel(self.config["moderation"]["log_channel"]),
         _punishment_format(self, message, document))

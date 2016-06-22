@@ -3,4 +3,4 @@ git+git://github.com/Rapptz/discord.py.git@async#egg=discord.py
 aiohttp
 pytz
 lxml
-pymongo
+motor

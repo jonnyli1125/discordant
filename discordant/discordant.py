@@ -9,7 +9,7 @@ from os import path
 
 import aiohttp
 import discord
-import pymongo
+import motor.motor_asyncio
 
 import discordant.utils as utils
 
@@ -31,7 +31,7 @@ class Discordant(discord.Client):
         self._token = ''
         self.command_char = ''
         self.controllers = []
-        self.mongodb_client = None
+        self.mongodb = None
         self.config = {}
         self.default_server = None
 
@@ -67,8 +67,8 @@ class Discordant(discord.Client):
             self._password = self.config['login']['password']
         self.command_char = self.config['commands']['command_char']
         self.controllers = self.config["client"]["controllers"]
-        self.mongodb_client = pymongo.MongoClient(
-            self.config["api-keys"]["mongodb"])
+        self.mongodb = motor.motor_asyncio.AsyncIOMotorClient(
+            self.config["api-keys"]["mongodb"]).get_default_database()
         self.load_aliases()
 
     def load_aliases(self):
@@ -93,29 +93,23 @@ class Discordant(discord.Client):
             await self._update_voice_roles(member, voice_role)
 
     async def load_punishment_timers(self):
-        db = self.mongodb_client.get_default_database()
-        collection = db["punishments"]
-        cursor = list(collection.find())
-        cursor.reverse()
-        for document in cursor:
+        cursor = await self.mongodb.punishments.find().to_list(None)
+        for document in reversed(cursor):
             action = document["action"]
             if action == "ban" or action.startswith("removed"):
                 continue
             member = self.default_server.get_member(document["user_id"])
             if member is None:
                 continue
-            if utils.is_punished(collection, member, action):
+            if await utils.is_punished(self, member, action):
                 await self.add_punishment_timer(member, action)
 
     async def add_punishment_timer(self, member, action):
-        db = self.mongodb_client.get_default_database()
-        collection = db["punishments"]
-        punishments = {"warning": "Warned", "mute": "Muted"}
-
         async def f():
-            nonlocal collection, punishments, member, action
+            nonlocal member, action
+            punishments = {"warning": "Warned", "mute": "Muted"}
             while True:
-                if not utils.is_punished(collection, member, action):
+                if not await utils.is_punished(self, member, action):
                     await self.remove_roles(
                         member,
                         discord.utils.get(
@@ -133,15 +127,13 @@ class Discordant(discord.Client):
         t.start()
 
     async def on_member_join(self, member):
-        db = self.mongodb_client.get_default_database()
-        collection = db["punishments"]
-        if utils.is_punished(collection, member, "ban"):
+        if await utils.is_punished(self, member, "ban"):
             await self.ban(member.server, member)
             return
-        if utils.is_punished(collection, member, "warning"):
+        if await utils.is_punished(self, member, "warning"):
             await self.add_roles(
                 member, discord.utils.get(member.server.roles, name="Warned"))
-        if utils.is_punished(collection, member, "mute"):
+        if await utils.is_punished(self, member, "mute"):
             await self.add_roles(
                 member, discord.utils.get(member.server.roles, name="Muted"))
 
@@ -154,10 +146,8 @@ class Discordant(discord.Client):
     async def on_voice_state_update(self, before, after):
         if before.voice_channel != after.voice_channel:
             roles = [discord.utils.get(after.server.roles, name="Voice")]
-            db = self.mongodb_client.get_default_database()
-            collection = db["always_show_vc"]
-            cursor = list(collection.find({"user_id": after.id}))
-            if not cursor or not cursor[0]["value"]:
+            doc = await self.mongodb.punishments.find_one({"user_id": after.id})
+            if not doc or not doc["value"]:
                 # discord.py library bug, so prepending to list for now.
                 roles.insert(
                     0, discord.utils.get(after.server.roles, name="VC Shown"))

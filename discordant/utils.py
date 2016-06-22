@@ -64,14 +64,14 @@ def get_user(search, seq):
     return discord.utils.find(f, seq)
 
 
-def is_punished(collection, member, action):
-    cursor = list(collection.find({"user_id": member.id}))
+async def is_punished(self, member, action):
+    cursor = await self.mongodb.punishments.find(
+        {"user_id": member.id}).to_list(None)
     cursor.reverse()
     if not cursor:
         return False
     if action == "ban":
-        return discord.utils.find(
-            lambda x: x["action"] == "ban", cursor) is not None
+        return bool(discord.utils.find(lambda x: x["action"] == "ban", cursor))
     else:
         def f(x):
             return x["action"] == action and \
@@ -92,4 +92,5 @@ def is_punished(collection, member, action):
 
 
 def has_permission(user, permission):
-    return len([x for x in user.roles if getattr(x.permissions, permission)]) > 0
+    return len(
+        [x for x in user.roles if getattr(x.permissions, permission)]) > 0
