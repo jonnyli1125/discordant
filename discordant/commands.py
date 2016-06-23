@@ -421,7 +421,7 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
         "duration": duration,
         "reason": reason
     }
-    await collection.insert_one(document)
+    await collection.insert(document)
     await self.add_roles(user, role)
     await self.add_punishment_timer(user, action)
     await self.send_message(
@@ -469,7 +469,7 @@ async def _mod_remove_cmd(self, args, message, cmd, action, role_name):
         "duration": 0,
         "reason": reason
     }
-    await collection.insert_one(document)
+    await collection.insert(document)
     await self.remove_roles(user, role)
     await self.send_message(
         self.get_channel(self.config["moderation"]["log_channel"]),
@@ -535,7 +535,7 @@ async def _ban(self, args, message):
         "duration": 0,
         "reason": reason
     }
-    await collection.insert_one(document)
+    await collection.insert(document)
     await self.send_message(
         self.get_channel(self.config["moderation"]["log_channel"]),
         _punishment_format(self, message, document))
