@@ -96,32 +96,20 @@ class Discordant(discord.Client):
             if action == "ban" or action.startswith("removed"):
                 continue
             member = self.default_server.get_member(document["user_id"])
-            if member is None:
-                continue
-            if await utils.is_punished(self, member, action):
+            if member and await utils.is_punished(self, member, action):
                 await self.add_punishment_timer(member, action)
 
     async def add_punishment_timer(self, member, action):
-        async def f():
-            nonlocal member, action
-            punishments = {"warning": "Warned", "mute": "Muted"}
-            while True:
-                if not await utils.is_punished(self, member, action):
-                    await self.remove_roles(
-                        member,
-                        discord.utils.get(
-                            member.server.roles, name=punishments[action]))
-                    break
-                await asyncio.sleep(
-                    self.config["moderation"]["punishment_check_rate"])
-
-        def loop_in_thread(l):
-            asyncio.set_event_loop(l)
-            l.run_until_complete(f())
-
-        loop = asyncio.new_event_loop()
-        t = threading.Thread(target=loop_in_thread, args=(loop,))
-        t.start()
+        punishments = {"warning": "Warned", "mute": "Muted"}
+        while True:
+            if not await utils.is_punished(self, member, action):
+                await self.remove_roles(
+                    member,
+                    discord.utils.get(
+                        member.server.roles, name=punishments[action]))
+                break
+            await asyncio.sleep(
+                self.config["moderation"]["punishment_check_rate"])
 
     async def on_member_join(self, member):
         if await utils.is_punished(self, member, "ban"):

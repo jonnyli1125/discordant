@@ -307,8 +307,8 @@ async def _show_voice_channels_toggle(self, args, message):
 
 
 #region moderation
-def _punishment_format(self, message, document):
-    server = message.server if message.server else self.default_server
+def _punishment_format(self, server, document):
+    server = server if server else self.default_server
     if "user" not in document:
         user_id = document["user_id"]
         user = server.get_member(user_id)
@@ -330,9 +330,10 @@ def _punishment_format(self, message, document):
         **document)
 
 
-def _punishment_history(self, message):
-    return "\n".join([_punishment_format(
-        self, message, x) for x in self.mongodb.punishments])
+async def _punishment_history(self, member):
+    return "\n".join([_punishment_format(self, member.server, x) for x in
+                      await self.mongodb.punishments.find(
+                          {"user_id": member.id}).to_list(None)])
 
 
 @Discordant.register_command("modhistory", section="mod")
@@ -349,7 +350,7 @@ async def _moderation_history(self, args, message):
     cursor = await collection.find({"user_id": user.id}).to_list(None)
     if cursor:
         await self.send_message(
-            message.channel, _punishment_history(self, message))
+            message.channel, await _punishment_history(self, user))
     else:
         await self.send_message(
             message.channel, user.name + " has no punishment history.")
@@ -402,8 +403,8 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
         if cursor:
             await self.send_message(
                 message.channel,
-                user.name + " has a history of:\n" + _punishment_history(
-                    self, message) + "\n\nType y/n to continue.")
+                user.name + " has a history of:\n" + await _punishment_history(
+                    self, user) + "\n\nType y/n to continue.")
             reply = await self.wait_for_message(
                 check=lambda m: m.author == message.author and
                                 (m.content.lower() == "y" or
@@ -426,7 +427,7 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
     await self.add_punishment_timer(user, action)
     await self.send_message(
         self.get_channel(self.config["moderation"]["log_channel"]),
-        _punishment_format(self, message, document))
+        _punishment_format(self, message.server, document))
 
 
 @Discordant.register_command("warn", section="mod")
@@ -473,7 +474,7 @@ async def _mod_remove_cmd(self, args, message, cmd, action, role_name):
     await self.remove_roles(user, role)
     await self.send_message(
         self.get_channel(self.config["moderation"]["log_channel"]),
-        _punishment_format(self, message, document))
+        _punishment_format(self, message.server, document))
 
 
 @Discordant.register_command("unwarn", section="mod")
@@ -538,6 +539,6 @@ async def _ban(self, args, message):
     await collection.insert(document)
     await self.send_message(
         self.get_channel(self.config["moderation"]["log_channel"]),
-        _punishment_format(self, message, document))
+        _punishment_format(self, message.server, document))
     await self.ban(user)  # run after the output or else user data is lost
 #endregion
