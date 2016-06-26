@@ -2,7 +2,6 @@ import asyncio
 import json
 import re
 import sys
-import threading
 from collections import namedtuple
 from inspect import iscoroutinefunction
 from os import path
@@ -80,34 +79,77 @@ class Discordant(discord.Client):
                 self._aliases[alias] = cmd_name
                 self._commands[cmd_name].aliases.append(alias)
 
+    async def discordme_bump(self):
+        cfg = self.config["api-keys"]["discordme"]
+        while True:
+            with aiohttp.ClientSession() as session:
+                async with session.post(
+                        "https://discord.me/signin",
+                        data=json.dumps(cfg["login"])
+                ) as response:
+                    if not response.status == 200:
+                        print("DiscordMe login failed.")
+                        return
+                async with session.get(
+                                "https://discord.me/server/bump/" + cfg["bump_id"]
+                ) as response:
+                    print("DiscordMe server bump" +
+                          ("ed." if response.status == 200 else " failed."))
+            await asyncio.sleep(cfg["bump_rate"])
+
     async def on_ready(self):
         await self.change_status(
             game=discord.Game(name=self.config["client"]["game"])
             if self.config["client"]["game"] else None)
         self.default_server = self.get_channel(
             self.config["moderation"]["log_channel"]).server
-        await self.load_punishment_timers()
         await self.load_voice_roles()
+        await self.load_punishment_timers()
+        if self.config["api-keys"]["discordme"]["login"]["username"]:
+            await self.discordme_bump()
 
     async def load_punishment_timers(self):
+        punishments = {
+            "warning": discord.utils.get(
+                self.default_server.roles, name="Warned"),
+            "mute": discord.utils.get(
+                self.default_server.roles, name="Muted")
+        }
         cursor = await self.mongodb.punishments.find().to_list(None)
+        to_remove = {}
         for document in reversed(cursor):
             action = document["action"]
             if action == "ban" or action.startswith("removed"):
                 continue
             member = self.default_server.get_member(document["user_id"])
-            if member and await utils.is_punished(self, member, action):
-                await self.add_punishment_timer(member, action)
+            if not member:
+                continue
+            if await utils.is_punished(self, member, action):
+                await self.add_punishment_timer(
+                    member, action, punishments[action])
+            elif punishments[action] in member.roles:
+                if member.id not in to_remove:
+                    to_remove[member.id] = []
+                to_remove[member.id].append(punishments[action])
+        for uid, roles in to_remove.items():
+            member = self.default_server.get_member(uid)
+            await asyncio.sleep(1)
+            await self.remove_roles(member, *roles)
+            print("Removed punishments for {}#{}: {}".format(
+                member.name,
+                member.discriminator,
+                ", ".join([x.name for x in roles])))
 
-    async def add_punishment_timer(self, member, action):
-        punishments = {"warning": "Warned", "mute": "Muted"}
+    async def add_punishment_timer(self, member, action, role):
         while True:
-            if not await utils.is_punished(self, member, action):
-                await self.remove_roles(
-                    member,
-                    discord.utils.get(
-                        member.server.roles, name=punishments[action]))
+            punished = await utils.is_punished(self, member, action)
+            member_str = member.name + "#" + member.discriminator
+            if not punished:
+                print("Removing punishment for " + member_str)
+                await self.remove_roles(member, role)
                 break
+            else:
+                print("Punishment timer: " + member_str + " is still punished")
             await asyncio.sleep(
                 self.config["moderation"]["punishment_check_rate"])
 
@@ -131,6 +173,8 @@ class Discordant(discord.Client):
         cursor = await self.mongodb.always_show_vc.find().to_list(None)
         for doc in cursor:
             member = self.default_server.get_member(doc["user_id"])
+            if not member:
+                continue
             show_vc_role = discord.utils.get(
                 self.default_server.roles, name="VC Shown")
             f = getattr(self, ("add" if doc["value"] else "remove") + "_roles")

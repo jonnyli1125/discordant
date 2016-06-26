@@ -74,9 +74,9 @@ async def is_punished(self, member, action):
         return bool(discord.utils.find(lambda x: x["action"] == "ban", cursor))
     else:
         def f(x):
-            return x["action"] == action and \
-                   (datetime.utcnow() - x["date"]).seconds / float(3600) < x[
-                       "duration"]
+            td = datetime.utcnow() - x["date"]
+            return x["action"] == action and td.seconds / float(
+                3600) + td.days * 24 < x["duration"]
         active = discord.utils.find(f, cursor)
         if not active:
             return False
@@ -85,8 +85,9 @@ async def is_punished(self, member, action):
             nonlocal active
             xd = x["date"]
             ad = active["date"]
+            td = xd - ad
             return x["action"] == "remove " + action and \
-                (xd > ad and (xd - ad).seconds / float(3600) < active[
+                (xd > ad and td.seconds / float(3600) + td.days * 24 < active[
                     "duration"])
         return discord.utils.find(g, cursor) is None
 

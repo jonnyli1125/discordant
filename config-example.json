@@ -12,7 +12,15 @@
 	},
 	"api-keys": {
 		"youtube": "xyz",
-		"mongodb": ""
+		"mongodb": "",
+		"discordme": {
+			"bump;_id": "<id from /server/bump url>",
+			"login": {
+				"username": "",
+				"password": ""
+			},
+			"bump_rate": 22000
+		}
 	},
 	"client": {
 		"game": "example game name",
