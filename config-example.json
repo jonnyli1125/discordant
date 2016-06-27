@@ -14,7 +14,7 @@
 		"youtube": "xyz",
 		"mongodb": "",
 		"discordme": {
-			"bump;_id": "<id from /server/bump url>",
+			"bump_id": "<id from /server/bump url>",
 			"login": {
 				"username": "",
 				"password": ""

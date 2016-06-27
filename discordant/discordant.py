@@ -85,16 +85,26 @@ class Discordant(discord.Client):
             with aiohttp.ClientSession() as session:
                 async with session.post(
                         "https://discord.me/signin",
-                        data=json.dumps(cfg["login"])
+                        data=cfg["login"]
                 ) as response:
                     if not response.status == 200:
-                        print("DiscordMe login failed.")
+                        print("DiscordMe login request failed.")
+                        return
+                    if '<li><a href="/logout">LOGOUT</a></li>' not in \
+                            await response.text():
+                        print("DiscordMe login credentials incorrect.")
                         return
                 async with session.get(
-                                "https://discord.me/server/bump/" + cfg["bump_id"]
+                                "https://discord.me/server/bump/" +
+                                cfg["bump_id"]
                 ) as response:
-                    print("DiscordMe server bump" +
-                          ("ed." if response.status == 200 else " failed."))
+                    if not response.status == 200:
+                        print("DiscordMe bump request failed.")
+                        return
+                    output = "failed: Already bumped within the last 6 hours." \
+                        if "you need to wait 6 hours between bumps!" in \
+                           await response.text() else "successful."
+                    print("DiscordMe server bump " + output)
             await asyncio.sleep(cfg["bump_rate"])
 
     async def on_ready(self):
