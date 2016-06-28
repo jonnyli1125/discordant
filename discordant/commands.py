@@ -180,7 +180,7 @@ async def _alc_search(self, args, message):
         return
     limit, query = search_args
     url = "http://eow.alc.co.jp/search?q=" + \
-          urllib.parse.quote(query, encoding="utf-8")
+          urllib.parse.quote(re.sub(r"\s+", "+", query), encoding="utf-8")
     try:
         with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
@@ -230,6 +230,22 @@ async def _alc_search(self, args, message):
         output = re.sub(r"(｛[^｝]*｝)|(【文例】)", "", output.strip()) + "\n"
     await utils.send_long_message(
         self, message.channel, output, message.server is not None)
+
+
+async def _dict_search_link(self, match, message, cmd, group):
+    await getattr(self, self._commands[self._aliases[cmd]].name)(
+        urllib.parse.unquote(match.group(group), encoding="utf-8"), message)
+
+
+@Discordant.register_handler(r"https?:\/\/(www\.)?jisho\.org\/search\/(\S*)")
+async def _jisho_link(self, match, message):
+    await _dict_search_link(self, match, message, "jisho", 2)
+
+
+@Discordant.register_handler(
+    r"https?:\/\/eow\.alc\.co\.jp\/search\?q=([^\s&]*)")
+async def _alc_link(self, match, message):
+    await _dict_search_link(self, match, message, "alc", 1)
 #endregion
 
 
