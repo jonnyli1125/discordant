@@ -237,9 +237,10 @@ async def _dict_search_link(self, match, message, cmd, group):
         urllib.parse.unquote(match.group(group), encoding="utf-8"), message)
 
 
-@Discordant.register_handler(r"https?:\/\/(www\.)?jisho\.org\/search\/(\S*)")
+@Discordant.register_handler(
+    r"https?:\/\/(www\.)?jisho\.org\/(search|word)\/(\S*)")
 async def _jisho_link(self, match, message):
-    await _dict_search_link(self, match, message, "jisho", 2)
+    await _dict_search_link(self, match, message, "jisho", 3)
 
 
 @Discordant.register_handler(
