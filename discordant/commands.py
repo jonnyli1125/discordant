@@ -6,6 +6,7 @@ from datetime import datetime
 
 import aiohttp
 import discord.game
+import shlex
 import pytz
 from lxml import html
 from pytz import timezone
@@ -320,6 +321,19 @@ async def _show_voice_channels_toggle(self, args, message):
             ". Type this command again to toggle.")
     if message.server:
         await _delete_after(self, 5, message, msg)
+
+
+@Discordant.register_command("say", section="bot")
+async def _say(self, args, message):
+    channel_mention = args.split()[0]
+    channel = None
+    for c in message.channel_mentions:
+        if c.mention == channel_mention:
+            channel = c
+    if not channel:
+        await self.send_message(message.channel, "Channel not found.")
+        return
+    await self.send_message(channel, args[len(channel_mention) + 1:])
 #endregion
 
 
@@ -387,9 +401,10 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
         return
     keys = ["duration", "reason"]
     kwargs = utils.get_kwargs(args, keys)
-    if not kwargs and " " in args:  # has more than one pos arg, no kwargs
-        i = args.find(" ") + 1
-        args = args[:i] + 'reason="' + args[i:] + '"'
+    split = shlex.split(args)
+    if not kwargs and len(split) > 1:
+        # has more than one pos arg, no kwargs
+        args = split[0] + ' reason="' + " ".join(split[1:]) + '"'
         kwargs = utils.get_kwargs(args, keys)
     user_search = utils.strip_kwargs(args, keys)
     user = utils.get_user(user_search, server.members)
@@ -441,7 +456,7 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
     }
     await collection.insert(document)
     await self.add_roles(user, role)
-    await self.add_punishment_timer(user, action)
+    await self.add_punishment_timer(user, action, role)
     await self.send_message(
         self.get_channel(self.config["moderation"]["log_channel"]),
         _punishment_format(self, message.server, document))
