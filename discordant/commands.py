@@ -1,12 +1,12 @@
 import asyncio
 import os.path
 import re
+import shlex
 import urllib.parse
 from datetime import datetime
 
 import aiohttp
 import discord.game
-import shlex
 import pytz
 from lxml import html
 from pytz import timezone
