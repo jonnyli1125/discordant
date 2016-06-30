@@ -37,16 +37,13 @@ async def _help(self, args, message):
 
 @Discordant.register_command("timezone")
 async def _convert_timezone(self, args, message):
-    def get_timezone_by_code(code, date):
+    def get_timezone_by_code(code):
         code = code.upper()
         for tz_str in pytz.all_timezones:
             tz = timezone(tz_str)
-            if tz.tzname(date) == code:
+            if tz.tzname(datetime.now()) == code:
                 return tz
         raise ValueError(code + ": not a valid time zone code")
-
-    def convert_timezone(date, tz_from, tz_to):
-        return tz_from.localize(date).astimezone(tz_to)
 
     def read_time(dt_str):
         formats = ["%I%p", "%I:%M%p", "%H", "%H:%M"]
@@ -60,7 +57,7 @@ async def _convert_timezone(self, args, message):
         raise ValueError(dt_str + ": not a valid time format")
 
     def relative_date_str(dt_1, dt_2):
-        delta = dt_2.day - dt_1.day
+        delta = (dt_2 - dt_1).days
         if delta == 0:
             return "same day"
         else:
@@ -76,19 +73,16 @@ async def _convert_timezone(self, args, message):
         return
     try:
         if len(split) == 1:
-            dt = datetime.utcnow()
-            new_dt = convert_timezone(
-                dt, pytz.utc, get_timezone_by_code(args, dt))
+            dt = pytz.utc.localize(datetime.utcnow())
+            new_dt = dt.astimezone(get_timezone_by_code(args))
             await self.send_message(
                 message.channel,
                 "It is currently " + new_dt.strftime("%I:%M %p %Z") + ".")
         else:
-            dt = read_time(split[0])
-            tz_f = get_timezone_by_code(split[1], dt)
-            tz_t = get_timezone_by_code(split[2], dt)
-            new_dt = convert_timezone(dt, tz_f, tz_t)
+            dt = get_timezone_by_code(split[1]).localize(read_time(split[0]))
+            new_dt = dt.astimezone(get_timezone_by_code(split[2]))
             await self.send_message(message.channel, "{} is {}, {}".format(
-                tz_f.localize(dt).strftime("%I:%M %p %Z"),
+                dt.strftime("%I:%M %p %Z"),
                 new_dt.strftime("%I:%M %p %Z"),
                 relative_date_str(dt, new_dt))
                                 )
