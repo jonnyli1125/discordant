@@ -68,19 +68,29 @@ async def _convert_timezone(self, args, message):
                                         "s" if abs(delta) != 1 else "",
                                         "ahead" if delta > 0 else "behind")
 
+    split = args.split()
+    if len(split) != 3 and len(split) != 1:
+        await self.send_message(
+            message.channel,
+            "!timezone <time> <from> <to>\n!timezone <timezone>")
+        return
     try:
-        split = args.split()
-        if len(split) != 3:
+        if len(split) == 1:
+            dt = datetime.utcnow()
+            new_dt = convert_timezone(
+                dt, pytz.utc, get_timezone_by_code(args, dt))
             await self.send_message(
-                message.channel, "!timezone <time> <from> <to>")
-        dt = read_time(split[0])
-        tz_f = get_timezone_by_code(split[1], dt)
-        tz_t = get_timezone_by_code(split[2], dt)
-        new_dt = convert_timezone(dt, tz_f, tz_t)
-        await self.send_message(message.channel, "{} is {}, {}".format(
-            tz_f.localize(dt).strftime("%I:%M %p %Z"),
-            new_dt.strftime("%I:%M %p %Z"),
-            relative_date_str(dt, new_dt))
+                message.channel,
+                "It is currently " + new_dt.strftime("%I:%M %p %Z") + ".")
+        else:
+            dt = read_time(split[0])
+            tz_f = get_timezone_by_code(split[1], dt)
+            tz_t = get_timezone_by_code(split[2], dt)
+            new_dt = convert_timezone(dt, tz_f, tz_t)
+            await self.send_message(message.channel, "{} is {}, {}".format(
+                tz_f.localize(dt).strftime("%I:%M %p %Z"),
+                new_dt.strftime("%I:%M %p %Z"),
+                relative_date_str(dt, new_dt))
                                 )
     except ValueError as e:
         await self.send_message(message.channel,
