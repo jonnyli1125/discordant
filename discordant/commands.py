@@ -87,8 +87,7 @@ async def _convert_timezone(self, args, message):
                 relative_date_str(dt, new_dt))
                                 )
     except ValueError as e:
-        await self.send_message(message.channel,
-                                "Timezone conversion failed: " + str(e))
+        await self.send_message(message.channel, str(e))
 
 
 async def _dict_search_args_parse(self, args, message, cmd):
@@ -365,10 +364,18 @@ def _punishment_format(self, server, document):
         **document)
 
 
-async def _punishment_history(self, member):
-    return "\n".join([_punishment_format(self, member.server, x) for x in
-                      await self.mongodb.punishments.find(
-                          {"user_id": member.id}).to_list(None)])
+async def _punishment_history(self, member, cursor):
+    output = ""
+    current = []
+    if await utils.is_punished(self, member, "warning"):
+        current.append("**warning**")
+    if await utils.is_punished(self, member, "mute"):
+        current.append("**mute**")
+    if current:
+        output += "currently active punishments: " + ", ".join(current) + "\n"
+    output += "\n".join(
+        [_punishment_format(self, member.server, x) for x in cursor])
+    return output
 
 
 @Discordant.register_command("modhistory", section="mod")
@@ -383,18 +390,17 @@ async def _moderation_history(self, args, message):
         return
     collection = self.mongodb.punishments
     cursor = await collection.find({"user_id": user.id}).to_list(None)
-    if cursor:
-        await self.send_message(
-            message.channel, await _punishment_history(self, user))
-    else:
-        await self.send_message(
-            message.channel, user.name + " has no punishment history.")
+    await self.send_message(
+        message.channel,
+        await _punishment_history(self, user, cursor)
+        if cursor else user.name + " has no punishment history.")
 
 
 async def _mod_cmd(self, args, message, cmd, action, role_name):
     server = message.server if message.server else self.default_server
-    if not utils.has_permission(message.author, "manage_roles"):
-        await self.send_message(message.channel,
+    member = server.get_member(message.author.id)
+    if not utils.has_permission(member, "manage_roles"):
+        await self.send_message(member,
                                 "You are not authorized to use this command.")
         return
     if not args:
@@ -440,7 +446,7 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
             await self.send_message(
                 message.channel,
                 user.name + " has a history of:\n" + await _punishment_history(
-                    self, user) + "\n\nType y/n to continue.")
+                    self, user, cursor) + "\n\nType y/n to continue.")
             reply = await self.wait_for_message(
                 check=lambda m: m.author == message.author and
                                 (m.content.lower() == "y" or
@@ -478,8 +484,9 @@ async def _mute(self, args, message):
 
 async def _mod_remove_cmd(self, args, message, cmd, action, role_name):
     server = message.server if message.server else self.default_server
-    if not utils.has_permission(message.author, "manage_roles"):
-        await self.send_message(message.channel,
+    member = server.get_member(message.author.id)
+    if not utils.has_permission(member, "manage_roles"):
+        await self.send_message(member,
                                 "You are not authorized to use this command.")
         return
     if not args:
@@ -528,8 +535,9 @@ async def _unmute(self, args, message):
 @Discordant.register_command("ban", section="mod")
 async def _ban(self, args, message):
     server = message.server if message.server else self.default_server
-    if not utils.has_permission(message.author, "ban_members"):
-        await self.send_message(message.channel,
+    member = server.get_member(message.author.id)
+    if not utils.has_permission(member, "ban_members"):
+        await self.send_message(member,
                                 "You are not authorized to use this command.")
         return
     if not args:
