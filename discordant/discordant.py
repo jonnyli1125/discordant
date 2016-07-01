@@ -33,6 +33,7 @@ class Discordant(discord.Client):
         self.mongodb = None
         self.config = {}
         self.default_server = None
+        self.commands_parsed = 0
 
         self.load_config(config_file)
 
@@ -229,6 +230,7 @@ class Discordant(discord.Client):
         if cmd_name in self._aliases:
             cmd = self._commands[self._aliases[cmd_name]]
             args = cmd.arg_func(args)
+            self.commands_parsed += 1
             await getattr(self, cmd.name)(args, message)
 
     @classmethod

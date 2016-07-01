@@ -1,12 +1,15 @@
 import asyncio
+import os
 import os.path
 import re
 import shlex
+import time
 import urllib.parse
 from datetime import datetime
 
 import aiohttp
 import discord.game
+import psutil
 import pytz
 from lxml import html
 from pytz import timezone
@@ -337,6 +340,23 @@ async def _say(self, args, message):
         await self.send_message(message.channel, "Channel not found.")
         return
     await self.send_message(channel, args[len(channel_mention) + 1:])
+
+
+@Discordant.register_command("stats", section="bot")
+async def _stats(self, args, message):
+    process = psutil.Process(os.getpid())
+    uptime = time.time() - process.create_time()
+    m, s = divmod(uptime, 60)
+    h, m = divmod(m, 60)
+    await self.send_message(
+        message.channel,
+        ("uptime: {} hours, {} minutes, {} seconds" +
+         "\ncommands parsed: {}" +
+         "\nmemory usage: {} MiB").format(
+            int(h), int(m), int(s),
+            self.commands_parsed,
+            process.memory_info().rss / float(2 ** 20)))
+
 #endregion
 
 
