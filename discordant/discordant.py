@@ -128,6 +128,7 @@ class Discordant(discord.Client):
         }
         cursor = await self.mongodb.punishments.find().to_list(None)
         to_remove = {}
+        timers = []
         for document in reversed(cursor):
             action = document["action"]
             if action == "ban" or action.startswith("removed"):
@@ -136,12 +137,13 @@ class Discordant(discord.Client):
             if not member:
                 continue
             if await utils.is_punished(self, member, action):
-                await self.add_punishment_timer(
-                    member, action, punishments[action])
+                timers.append(self.add_punishment_timer(
+                    member, action, punishments[action]))
             elif punishments[action] in member.roles:
                 if member.id not in to_remove:
                     to_remove[member.id] = []
                 to_remove[member.id].append(punishments[action])
+        await asyncio.gather(*timers)
         for uid, roles in to_remove.items():
             member = self.default_server.get_member(uid)
             await asyncio.sleep(1)
