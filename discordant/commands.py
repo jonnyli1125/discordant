@@ -486,10 +486,10 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
     }
     await collection.insert(document)
     await self.add_roles(user, role)
-    await self.add_punishment_timer(user, action, role)
     await self.send_message(
         self.get_channel(self.config["moderation"]["log_channel"]),
         _punishment_format(self, message.server, document))
+    await self.add_punishment_timer(user, action, role)
 
 
 @Discordant.register_command("warn", section="mod")
