@@ -115,9 +115,10 @@ class Discordant(discord.Client):
         self.default_server = self.get_channel(
             self.config["moderation"]["log_channel"]).server
         await self.load_voice_roles()
-        await self.load_punishment_timers()
+        coros = [self.load_punishment_timers()]
         if self.config["api-keys"]["discordme"]["login"]["username"]:
-            await self.discordme_bump()
+            coros.append(self.discordme_bump())
+        await asyncio.gather(*coros)
 
     async def load_punishment_timers(self):
         punishments = {
