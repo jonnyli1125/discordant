@@ -331,7 +331,11 @@ async def _show_voice_channels_toggle(self, args, message):
 
 @Discordant.register_command("say", section="bot")
 async def _say(self, args, message):
-    channel_mention = args.split()[0]
+    split = args.split(" ")
+    if len(split) <= 1:
+        await self.send_message(message.channel, "!say <channel> <message>")
+        return
+    channel_mention = split[0]
     channel = None
     for c in message.channel_mentions:
         if c.mention == channel_mention:
@@ -340,6 +344,29 @@ async def _say(self, args, message):
         await self.send_message(message.channel, "Channel not found.")
         return
     await self.send_message(channel, args[len(channel_mention) + 1:])
+
+
+@Discordant.register_command("edit", section="bot")
+async def _say(self, args, message):
+    split = args.split(" ")
+    if len(split) <= 2:
+        await self.send_message(message.channel,
+                                "!edit <channel> <message id> <message>")
+        return
+    channel_mention = split[0]
+    channel = None
+    for c in message.channel_mentions:
+        if c.mention == channel_mention:
+            channel = c
+    if not channel:
+        await self.send_message(message.channel, "Channel not found.")
+        return
+    msg_id = split[1]
+    msg = await self.get_message(channel, msg_id)
+    if not msg:
+        await self.send_message(message.channel, "Message not found.")
+        return
+    await self.edit_message(msg, args[len(msg_id) + len(channel_mention) + 2:])
 
 
 @Discordant.register_command("stats", section="bot")
