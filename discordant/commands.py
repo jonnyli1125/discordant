@@ -331,6 +331,10 @@ async def _show_voice_channels_toggle(self, args, message):
 
 @Discordant.register_command("say", section="bot")
 async def _say(self, args, message):
+    if message.author.id not in self.controllers:
+        await self.send_message(message.channel,
+                                "You are not authorized to use this command.")
+        return
     split = args.split(" ")
     if len(split) <= 1:
         await self.send_message(message.channel, "!say <channel> <message>")
@@ -347,7 +351,11 @@ async def _say(self, args, message):
 
 
 @Discordant.register_command("edit", section="bot")
-async def _say(self, args, message):
+async def _edit(self, args, message):
+    if message.author.id not in self.controllers:
+        await self.send_message(message.channel,
+                                "You are not authorized to use this command.")
+        return
     split = args.split(" ")
     if len(split) <= 2:
         await self.send_message(message.channel,
