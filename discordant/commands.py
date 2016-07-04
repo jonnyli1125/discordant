@@ -422,9 +422,9 @@ def _punishment_format(self, server, document):
 async def _punishment_history(self, member, cursor):
     output = ""
     current = []
-    if await utils.is_punished(self, member, "warning"):
+    if await utils._is_punished(cursor, "warning"):
         current.append("**warning**")
-    if await utils.is_punished(self, member, "mute"):
+    if await utils._is_punished(cursor, "mute"):
         current.append("**mute**")
     if current:
         output += "currently active punishments: " + ", ".join(current) + "\n"
@@ -451,7 +451,7 @@ async def _moderation_history(self, args, message):
         if cursor else user.name + " has no punishment history.")
 
 
-async def _mod_cmd(self, args, message, cmd, action, role_name):
+async def _mod_cmd(self, args, message, cmd, action):
     server = message.server if message.server else self.default_server
     member = server.get_member(message.author.id)
     if not utils.has_permission(member, "manage_roles"):
@@ -488,7 +488,7 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
         await self.send_message(message.channel, "Invalid duration.")
         return
     reason = utils.get_from_kwargs("reason", kwargs, "No reason given.")
-    role = discord.utils.get(server.roles, name=role_name)
+    role = utils.action_to_role(self, action)
     collection = self.mongodb.punishments
     if await utils.is_punished(self, user, action):
         await self.send_message(
@@ -522,22 +522,22 @@ async def _mod_cmd(self, args, message, cmd, action, role_name):
     await collection.insert(document)
     await self.add_roles(user, role)
     await self.send_message(
-        self.get_channel(self.config["moderation"]["log_channel"]),
+        self.log_channel,
         _punishment_format(self, message.server, document))
     await self.add_punishment_timer(user, action, role)
 
 
 @Discordant.register_command("warn", section="mod")
 async def _warn(self, args, message):
-    await _mod_cmd(self, args, message, "warn", "warning", "Warned")
+    await _mod_cmd(self, args, message, "warn", "warning")
 
 
 @Discordant.register_command("mute", section="mod")
 async def _mute(self, args, message):
-    await _mod_cmd(self, args, message, "mute", "mute", "Muted")
+    await _mod_cmd(self, args, message, "mute", "mute")
 
 
-async def _mod_remove_cmd(self, args, message, cmd, action, role_name):
+async def _mod_remove_cmd(self, args, message, cmd, action):
     server = message.server if message.server else self.default_server
     member = server.get_member(message.author.id)
     if not utils.has_permission(member, "manage_roles"):
@@ -553,7 +553,7 @@ async def _mod_remove_cmd(self, args, message, cmd, action, role_name):
     if user is None:
         await self.send_message(message.channel, "User could not be found.")
         return
-    role = discord.utils.get(server.roles, name=role_name)
+    role = utils.action_to_role(self, action)
     collection = self.mongodb.punishments
     orig_action = action.replace("remove ", "")
     if not await utils.is_punished(self, user, orig_action):
@@ -571,20 +571,18 @@ async def _mod_remove_cmd(self, args, message, cmd, action, role_name):
     await collection.insert(document)
     await self.remove_roles(user, role)
     await self.send_message(
-        self.get_channel(self.config["moderation"]["log_channel"]),
+        self.log_channel,
         _punishment_format(self, message.server, document))
 
 
 @Discordant.register_command("unwarn", section="mod")
 async def _unwarn(self, args, message):
-    await _mod_remove_cmd(
-        self, args, message, "unwarn", "remove warning", "Warned")
+    await _mod_remove_cmd(self, args, message, "unwarn", "remove warning")
 
 
 @Discordant.register_command("unmute", section="mod")
 async def _unmute(self, args, message):
-    await _mod_remove_cmd(
-        self, args, message, "unmute", "remove mute", "Muted")
+    await _mod_remove_cmd(self, args, message, "unmute", "remove mute")
 
 
 @Discordant.register_command("ban", section="mod")
@@ -637,7 +635,7 @@ async def _ban(self, args, message):
     }
     await collection.insert(document)
     await self.send_message(
-        self.get_channel(self.config["moderation"]["log_channel"]),
+        self.log_channel,
         _punishment_format(self, message.server, document))
     await self.ban(user)  # run after the output or else user data is lost
 #endregion

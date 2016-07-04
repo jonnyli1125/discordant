@@ -64,12 +64,23 @@ def get_user(search, seq):
     return discord.utils.find(f, seq)
 
 
-async def is_punished(self, member, action):
+async def is_punished(self, member, *actions):
+    punishments = ["ban", "warning", "mute"]
+    if not set(actions) <= set(punishments):
+        raise ValueError("Invalid action, must be one of: " +
+                         ", ".join(punishments))
     cursor = await self.mongodb.punishments.find(
         {"user_id": member.id}).to_list(None)
     cursor.reverse()
     if not cursor:
         return False
+    actions = actions if actions else punishments
+    for action in actions:
+        if _is_punished(cursor, action):
+            return True
+    return False
+
+async def _is_punished(cursor, action):
     if action == "ban":
         return bool(discord.utils.find(lambda x: x["action"] == "ban", cursor))
     else:
@@ -90,6 +101,17 @@ async def is_punished(self, member, action):
                 (xd > ad and td.seconds / float(3600) + td.days * 24 < active[
                     "duration"])
         return discord.utils.find(g, cursor) is None
+
+
+def action_to_role(self, action):
+    dct = {
+        "warning": "Warned",
+        "mute": "Muted"
+    }
+    if action not in dct:
+        raise ValueError("Invalid action, must be one of: " +
+                         ", ".join(dct.keys()))
+    return discord.utils.get(self.default_server.roles, name=dct[action])
 
 
 def has_permission(user, permission):

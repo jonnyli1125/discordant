@@ -2,6 +2,7 @@ import asyncio
 import json
 import re
 import sys
+import traceback
 from collections import namedtuple
 from inspect import iscoroutinefunction
 from os import path
@@ -34,6 +35,8 @@ class Discordant(discord.Client):
         self.config = {}
         self.default_server = None
         self.commands_parsed = 0
+        self.log_channel = None
+        self.staff_channel = None
 
         self.load_config(config_file)
 
@@ -109,24 +112,28 @@ class Discordant(discord.Client):
             await asyncio.sleep(cfg["bump_rate"])
 
     async def on_ready(self):
+        self.log_channel = self.get_channel(
+            self.config["moderation"]["log_channel"])
+        self.staff_channel = self.get_channel(
+            self.config["moderation"]["staff_channel"])
+        self.default_server = self.log_channel.server
         await self.change_status(
             game=discord.Game(name=self.config["client"]["game"])
             if self.config["client"]["game"] else None)
-        self.default_server = self.get_channel(
-            self.config["moderation"]["log_channel"]).server
         await self.load_voice_roles()
         coros = [self.load_punishment_timers()]
         if self.config["api-keys"]["discordme"]["login"]["username"]:
             coros.append(self.discordme_bump())
         await asyncio.gather(*coros)
 
+    async def on_error(self, event_method, *args, **kwargs):
+        await super().on_error(event_method, *args, **kwargs)
+        for uid in self.controllers:
+            await self.send_message(
+                self.default_server.get_member(uid),
+                "```{}```".format(traceback.format_exc()))
+
     async def load_punishment_timers(self):
-        punishments = {
-            "warning": discord.utils.get(
-                self.default_server.roles, name="Warned"),
-            "mute": discord.utils.get(
-                self.default_server.roles, name="Muted")
-        }
         cursor = await self.mongodb.punishments.find().to_list(None)
         to_remove = {}
         timers = []
@@ -137,13 +144,14 @@ class Discordant(discord.Client):
             member = self.default_server.get_member(document["user_id"])
             if not member:
                 continue
+            role = utils.action_to_role(self, action)
             if await utils.is_punished(self, member, action):
                 timers.append(self.add_punishment_timer(
-                    member, action, punishments[action]))
-            elif punishments[action] in member.roles:
+                    member, action))
+            elif role in member.roles:
                 if member.id not in to_remove:
                     to_remove[member.id] = []
-                to_remove[member.id].append(punishments[action])
+                to_remove[member.id].append(role)
         await asyncio.gather(*timers)
         for uid, roles in to_remove.items():
             member = self.default_server.get_member(uid)
@@ -154,7 +162,8 @@ class Discordant(discord.Client):
                 member.discriminator,
                 ", ".join([x.name for x in roles])))
 
-    async def add_punishment_timer(self, member, action, role):
+    async def add_punishment_timer(self, member, action):
+        role = utils.action_to_role(self, action)
         while True:
             punished = await utils.is_punished(self, member, action)
             member_str = member.name + "#" + member.discriminator
@@ -168,15 +177,30 @@ class Discordant(discord.Client):
                 self.config["moderation"]["punishment_check_rate"])
 
     async def on_member_join(self, member):
-        if await utils.is_punished(self, member, "ban"):
-            await self.ban(member.server, member)
-            return
-        if await utils.is_punished(self, member, "warning"):
-            await self.add_roles(
-                member, discord.utils.get(member.server.roles, name="Warned"))
-        if await utils.is_punished(self, member, "mute"):
-            await self.add_roles(
-                member, discord.utils.get(member.server.roles, name="Muted"))
+        if await utils.is_punished(self, member):
+            await self.send_message(
+                self.staff_channel,
+                "Punished user {}#{} ({}) joined the server.".format(
+                    member.name, member.discriminator, member.id))
+            if await utils.is_punished(self, member, "ban"):
+                await self.ban(member)
+            else:
+                to_add = []
+                timers = []
+                for action in ["warning", "mute"]:
+                    if await utils.is_punished(self, member, action):
+                        to_add.append(utils.action_to_role(self, action))
+                        timers.append(self.add_punishment_timer(member, action))
+                if to_add:
+                    await asyncio.gather(self.add_roles(member, *to_add),
+                                         *timers)
+
+    async def on_member_leave(self, member):
+        if await utils.is_punished(self, member):
+            await self.send_message(
+                self.staff_channel,
+                "Punished user {}#{} ({}) left the server.".format(
+                    member.name, member.discriminator, member.id))
 
     async def load_voice_roles(self):
         voice_role = discord.utils.get(self.default_server.roles, name="Voice")
@@ -207,9 +231,8 @@ class Discordant(discord.Client):
             doc = await self.mongodb.always_show_vc.find_one(
                 {"user_id": after.id})
             if not doc or not doc["value"]:
-                # discord.py library bug, so prepending to list for now.
-                roles.insert(
-                    0, discord.utils.get(after.server.roles, name="VC Shown"))
+                roles.append(
+                    discord.utils.get(after.server.roles, name="VC Shown"))
             await self._update_voice_roles(after, *roles)
 
     async def on_message(self, message):

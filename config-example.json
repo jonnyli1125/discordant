@@ -30,6 +30,7 @@
 		"warn_duration": 336,
 		"mute_duration": 48,
 		"log_channel": "<channel id>",
-		"punishment_check_rate": 3600
+		"punishment_check_rate": 3600,
+		"staff_channel": "<channel id>"
 	}
 }
