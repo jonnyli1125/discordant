@@ -76,7 +76,7 @@ async def is_punished(self, member, *actions):
         return False
     actions = actions if actions else punishments
     for action in actions:
-        if _is_punished(cursor, action):
+        if await _is_punished(cursor, action):
             return True
     return False
 
