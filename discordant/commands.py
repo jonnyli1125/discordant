@@ -27,14 +27,20 @@ async def _help(self, args, message):
         section = default
     cmds = [cmd.aliases[0] for cmd in self._commands.values()
             if cmd.section == section]
-    output = ""
-    if cmds:
-        output += "Commands: " + ", ".join(cmds) + "\n"
-    if not args or not cmds:
+    output = "Commands: " + ", ".join(cmds)
+    if not args:
         sections = list({cmd.section + (" *(default)*"
                         if cmd.section == default else "")
                         for cmd in self._commands.values()})
-        output += "!help [section]\nSections: " + ", ".join(sections)
+        output += "\n\nType !help [section] to display more commands.\n" + \
+                  "Sections: " + ", ".join(sections) + "\n\n" + \
+                  "Command help syntax:\n" + \
+                  "[] - optional argument\n" + \
+                  "<> - required argument\n" + \
+                  "* - any number of arguments\n" + \
+                  "key=value - kwargs style argument " + \
+                  "(each key-value pair is separated by space, " + \
+                  "and the key and value are separated by the \"=\" character)."
     await self.send_message(message.channel, output.strip())
 
 
@@ -59,6 +65,13 @@ async def _convert_timezone(self, args, message):
                 pass
         raise ValueError(dt_str + ": not a valid time format")
 
+    def is_time(dt_str):
+        try:
+            read_time(dt_str)
+        except ValueError:
+            return False
+        return True
+
     def relative_date_str(dt_1, dt_2):
         delta = (dt_2 - dt_1).days
         if delta == 0:
@@ -68,27 +81,31 @@ async def _convert_timezone(self, args, message):
                                         "s" if abs(delta) != 1 else "",
                                         "ahead" if delta > 0 else "behind")
 
-    split = args.split()
-    if len(split) != 3 and len(split) != 1:
+    def dt_format(dt, tz_str, relative):
+        new_dt = dt.astimezone(get_timezone_by_code(tz_str))
+        return new_dt.strftime("%I:%M %p %Z") + (
+            ", " + relative_date_str(dt, new_dt) if relative else "")
+
+    if not args:
         await self.send_message(
             message.channel,
-            "!timezone <time> <from> <to>\n!timezone <timezone>")
+            "!timezone <time> <from> <*to>\n!timezone <*timezone>")
         return
+    split = args.split()
     try:
-        if len(split) == 1:
-            dt = pytz.utc.localize(datetime.utcnow())
-            new_dt = dt.astimezone(get_timezone_by_code(args))
-            await self.send_message(
-                message.channel,
-                "It is currently " + new_dt.strftime("%I:%M %p %Z") + ".")
-        else:
+        is_t = is_time(split[0])
+        if is_t:
             dt = get_timezone_by_code(split[1]).localize(read_time(split[0]))
-            new_dt = dt.astimezone(get_timezone_by_code(split[2]))
-            await self.send_message(message.channel, "{} is {}, {}".format(
+            tz_strs = split[2:]
+            output = "{} is{}".format(
                 dt.strftime("%I:%M %p %Z"),
-                new_dt.strftime("%I:%M %p %Z"),
-                relative_date_str(dt, new_dt))
-                                )
+                ":\n" if len(tz_strs) > 1 else " ")
+        else:
+            dt = pytz.utc.localize(datetime.utcnow())
+            tz_strs = split
+            output = "It is currently" + (":\n" if len(tz_strs) > 1 else " ")
+        output += "\n".join([dt_format(dt, tz_str, is_t) for tz_str in tz_strs])
+        await self.send_message(message.channel, output)
     except ValueError as e:
         await self.send_message(message.channel, str(e))
 

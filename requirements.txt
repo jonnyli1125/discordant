@@ -1,5 +1,5 @@
 cffi
--e git+git://github.com/Rapptz/discord.py.git@async#egg=discord.py
+-e git+git://github.com/Rapptz/discord.py.git@master#egg=discord.py
 aiohttp
 pytz
 lxml

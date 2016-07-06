@@ -146,6 +146,8 @@ class Discordant(discord.Client):
                 continue
             role = utils.action_to_role(self, action)
             if await utils.is_punished(self, member, action):
+                print("Adding punishment timer for {}#{}".format(
+                    member.name, member.discriminator))
                 timers.append(self.add_punishment_timer(
                     member, action))
             elif role in member.roles:
@@ -166,13 +168,11 @@ class Discordant(discord.Client):
         role = utils.action_to_role(self, action)
         while True:
             punished = await utils.is_punished(self, member, action)
-            member_str = member.name + "#" + member.discriminator
             if not punished:
-                print("Removing punishment for " + member_str)
+                print("Removing punishment for {}#{}".format(
+                    member.name, member.discriminator))
                 await self.remove_roles(member, role)
                 break
-            else:
-                print("Punishment timer: " + member_str + " is still punished")
             await asyncio.sleep(
                 self.config["moderation"]["punishment_check_rate"])
 
