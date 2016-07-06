@@ -18,8 +18,7 @@
 			"login": {
 				"username": "",
 				"password": ""
-			},
-			"bump_rate": 22000
+			}
 		}
 	},
 	"client": {
