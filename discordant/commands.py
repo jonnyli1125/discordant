@@ -150,7 +150,7 @@ async def _jisho_search(self, args, message):
     if not results:
         sent = await self.send_message(message.channel, "No results found.")
         if message.server:
-            await _delete_after(self, 5, message, sent)
+            await _delete_after(self, 5, [message, sent])
         return
     output = ""
 
@@ -218,7 +218,7 @@ async def _alc_search(self, args, message):
     if not results:
         sent = await self.send_message(message.channel, "No results found.")
         if message.server:
-            await _delete_after(self, 5, message, sent)
+            await _delete_after(self, 5, [message, sent])
         return
     for result in results:
         words = [x for x in result.xpath('./span') if
@@ -271,6 +271,66 @@ async def _jisho_link(self, match, message):
     r"https?:\/\/eow\.alc\.co\.jp\/search\?q=([^\s&]*)")
 async def _alc_link(self, match, message):
     await _dict_search_link(self, match, message, "alc", 1)
+
+
+async def _delete_after(self, time, args):
+    await asyncio.sleep(time)
+    f = getattr(
+        self, "delete_message" + ("s" if isinstance(args, list) else ""))
+    await f(args)
+
+
+@Discordant.register_command("showvc")
+async def _show_voice_channels_toggle(self, args, message):
+    query = {"user_id": message.author.id}
+    collection = self.mongodb.always_show_vc
+    cursor = await collection.find(query).to_list(None)
+    if not cursor:
+        show = True
+        await collection.insert({"user_id": message.author.id, "value": show})
+    else:
+        show = not cursor[0]["value"]
+        await collection.update(query, {"$set": {"value": show}})
+    role = discord.utils.get(self.default_server.roles, name="VC Shown")
+
+    member = message.author if message.server \
+        else self.default_server.get_member(message.author.id)
+    if show:
+        await self.add_roles(member, role)
+        msg = await self.send_message(
+            message.channel,
+            "Now always showing voice channels for " + message.author.name +
+            ". Type this command again to toggle.")
+    else:
+        if not member.voice_channel:
+            await self.remove_roles(member, role)
+        msg = await self.send_message(
+            message.channel,
+            "Now hiding voice channels for " + message.author.name +
+            ". Type this command again to toggle.")
+    if message.server:
+        await _delete_after(self, 5, [message, msg])
+
+
+@Discordant.register_command("readingcircle")
+async def _reading_circle(self, args, message):
+    try:
+        author = message.author if message.server \
+            else self.default_server.get_member(message.author.id)
+        role_name = "Reading Circle " + args[0].upper() + args[1:].lower()
+        role = discord.utils.get(author.server.roles, name=role_name)
+        if role in author.roles:
+            await self.remove_roles(author, role)
+            msg = await self.send_message(
+                message.channel, ":negative_squared_cross_mark:")
+        else:
+            await self.add_roles(author, role)
+            msg = await self.send_message(message.channel, ":white_check_mark:")
+    except (AttributeError, IndexError):
+        msg = await self.send_message(
+            message.channel, "!readingcircle <beginner/intermediate>")
+    if message.server:
+        await _delete_after(self, 5, [message, msg])
 #endregion
 
 
@@ -306,44 +366,6 @@ async def _client_settings(self, args, message):
             return
     await self.edit_profile(self._password, **kwargs)
     await self.send_message(message.channel, "Settings updated.")
-
-
-async def _delete_after(self, time, *args):
-    await asyncio.sleep(time)
-    for msg in args:
-        await self.delete_message(msg)
-
-
-@Discordant.register_command("showvc", section="bot")
-async def _show_voice_channels_toggle(self, args, message):
-    query = {"user_id": message.author.id}
-    collection = self.mongodb.always_show_vc
-    cursor = await collection.find(query).to_list(None)
-    if not cursor:
-        show = True
-        await collection.insert({"user_id": message.author.id, "value": show})
-    else:
-        show = not cursor[0]["value"]
-        await collection.update(query, {"$set": {"value": show}})
-    role = discord.utils.get(self.default_server.roles, name="VC Shown")
-
-    member = message.author if message.server \
-        else self.default_server.get_member(message.author.id)
-    if show:
-        await self.add_roles(member, role)
-        msg = await self.send_message(
-            message.channel,
-            "Now always showing voice channels for " + message.author.name +
-            ". Type this command again to toggle.")
-    else:
-        if not member.voice_channel:
-            await self.remove_roles(member, role)
-        msg = await self.send_message(
-            message.channel,
-            "Now hiding voice channels for " + message.author.name +
-            ". Type this command again to toggle.")
-    if message.server:
-        await _delete_after(self, 5, message, msg)
 
 
 @Discordant.register_command("say", section="bot")
