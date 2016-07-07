@@ -297,17 +297,12 @@ async def _show_voice_channels_toggle(self, args, message):
         else self.default_server.get_member(message.author.id)
     if show:
         await self.add_roles(member, role)
-        msg = await self.send_message(
-            message.channel,
-            "Now always showing voice channels for " + message.author.name +
-            ". Type this command again to toggle.")
+        msg = await self.send_message(message.channel, ":white_check_mark:")
     else:
         if not member.voice_channel:
             await self.remove_roles(member, role)
         msg = await self.send_message(
-            message.channel,
-            "Now hiding voice channels for " + message.author.name +
-            ". Type this command again to toggle.")
+            message.channel, ":negative_squared_cross_mark:")
     if message.server:
         await _delete_after(self, 5, [message, msg])
 
@@ -430,6 +425,24 @@ async def _stats(self, args, message):
             int(h), int(m), int(s),
             self.commands_parsed,
             process.memory_info().rss / float(2 ** 20)))
+
+
+@Discordant.register_command("userinfo", section="bot")
+async def _userinfo(self, args, message):
+    if not args:
+        await self.send_message(message.channel, "!userinfo <user>")
+        return
+    user = utils.get_user(args, message.server.members)
+    if user is None:
+        await self.send_message(message.channel, "User could not be found.")
+        return
+    await self.send_message(
+        message.channel,
+        ("**name**: {0.name}#{0.discriminator}\n" +
+         "**id**: {0.id}\n" +
+         "**account created**: {0.created_at}\n" +
+         "**joined server**: {0.joined_at}\n" +
+         "**avatar**: {0.avatar_url}").format(user))
 
 #endregion
 

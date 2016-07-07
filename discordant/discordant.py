@@ -54,7 +54,7 @@ class Discordant(discord.Client):
                     async with session.get(config_file) as response:
                         self.config = await response.json()
 
-            asyncio.get_event_loop().run_until_complete(f())
+            self.loop.run_until_complete(f())
         elif not path.exists(config_file):
             print("No config file found (expected '{}').".format(config_file))
             print("Copy config-example.json to", config_file,
