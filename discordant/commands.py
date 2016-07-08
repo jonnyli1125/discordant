@@ -263,7 +263,8 @@ async def _dict_search_link(self, match, message, cmd, group):
 
 @Discordant.register_handler(r"http:\/\/jisho\.org\/(search|word)\/(\S*)")
 async def _jisho_link(self, match, message):
-    await _dict_search_link(self, match, message, "jisho", 3)
+    if "%23" not in match.group(2):
+        await _dict_search_link(self, match, message, "jisho", 2)
 
 
 @Discordant.register_handler(r"http:\/\/eow\.alc\.co\.jp\/search\?q=([^\s&]*)")
@@ -295,22 +296,22 @@ async def _example_sentence_search(self, args, message, cmd, url):
         if message.server:
             await _delete_after(self, 5, [message, sent])
         return
+    japanese = cmd == "yourei"
 
     def sentence_text(element, class_prefix="the"):
-        nonlocal cmd
         lst = element.xpath('span[@class="' + class_prefix + '-sentence"]')
-        return ("" if cmd == "yourei" else " ").join(
+        return ("" if japanese else " ").join(
             lst[0].xpath("text() | */text()")) if lst else ""
 
     def result_text(element):
-        nonlocal context
         text = sentence_text(element)
         match = re.search(r'"([^"]*)"', tree.xpath("//script[1]/text()")[0])
         pattern = match.group(1).replace("\\\\", "\\")
         text = re.sub(pattern, r"**\1**", text, flags=re.I)
         if context:
-            text = sentence_text(element, "prev") + text + sentence_text(
-                element, "next")
+            sentences = [x for x in [sentence_text(element, "prev"), text,
+                                     sentence_text(element, "next")] if x]
+            text = ("" if japanese else " ").join(sentences)
         return text
 
     await utils.send_long_message(
