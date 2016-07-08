@@ -180,9 +180,9 @@ async def _jisho_search(self, args, message):
             output += str(index + 1) + ". " + "; ".join(
                 sense["english_definitions"])
             for attr in ["tags", "info"]:
-                if sense[attr]:
-                    output += ". *" + "*. *".join(
-                        [x for x in sense[attr] if x]) + "*"
+                sense_attr = [x for x in sense[attr] if x]
+                if sense_attr:
+                    output += ". *" + "*. *".join(sense_attr) + "*"
             if sense["see_also"]:
                 output += ". *See also*: " + ", ".join(sense["see_also"])
             output += "\n"
