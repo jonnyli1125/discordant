@@ -261,14 +261,12 @@ async def _dict_search_link(self, match, message, cmd, group):
         urllib.parse.unquote(match.group(group), encoding="utf-8"), message)
 
 
-@Discordant.register_handler(
-    r"https?:\/\/(www\.)?jisho\.org\/(search|word)\/(\S*)")
+@Discordant.register_handler(r"http:\/\/jisho\.org\/(search|word)\/(\S*)")
 async def _jisho_link(self, match, message):
     await _dict_search_link(self, match, message, "jisho", 3)
 
 
-@Discordant.register_handler(
-    r"https?:\/\/eow\.alc\.co\.jp\/search\?q=([^\s&]*)")
+@Discordant.register_handler(r"http:\/\/eow\.alc\.co\.jp\/search\?q=([^\s&]*)")
 async def _alc_link(self, match, message):
     await _dict_search_link(self, match, message, "alc", 1)
 
@@ -334,6 +332,11 @@ async def _nyanglish_search(self, args, message):
     await _example_sentence_search(
         self, args, message, "nyanglish", "http://nyanglish.com/")
 
+
+@Discordant.register_handler(r"http:\/\/(yourei\.jp|nyanglish\.com)\/(\S*)")
+async def _yourei_link(self, match, message):
+    await _dict_search_link(
+        self, match, message, match.group(1).split(".")[0], 2)
 
 async def _delete_after(self, time, args):
     await asyncio.sleep(time)
