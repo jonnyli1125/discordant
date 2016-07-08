@@ -110,25 +110,24 @@ async def _convert_timezone(self, args, message):
         await self.send_message(message.channel, str(e))
 
 
-async def _dict_search_args_parse(self, args, message, cmd):
+async def _dict_search_args_parse(self, args, message, cmd, keys=None):
     if not args:
-        await self.send_message(message.channel, "!" + cmd + " [limit] <query>")
+        await self.send_message(
+            message.channel,
+            "!" + cmd + " [limit] " + "".join(
+                ["[" + key + "=value] " for key in (keys if keys else [])]) +
+            "<query>")
         return
     limit = 1
     query = args
-    result = re.match(r"^([0-9]+)\s+(.*)$", args)
+    kwargs = {}
+    if keys:
+        kwargs = utils.get_kwargs(args, keys)
+        query = utils.strip_kwargs(args, keys)
+    result = re.match(r"^([0-9]+)\s+(.*)$", query)
     if result:
         limit, query = [result.group(x) for x in (1, 2)]
-    return int(limit), query
-    # keys = ["limit"]
-    # kwargs = utils.get_kwargs(args, keys)
-    # try:
-    #     limit = int(kwargs["limit"])
-    #     if limit <= 0:
-    #         raise ValueError
-    # except (ValueError, KeyError):
-    #     limit = 1
-    # query = utils.strip_kwargs(args, keys)
+    return (int(limit), query) + ((kwargs,) if keys else ())
 
 
 @Discordant.register_command("jisho")
@@ -271,6 +270,68 @@ async def _jisho_link(self, match, message):
     r"https?:\/\/eow\.alc\.co\.jp\/search\?q=([^\s&]*)")
 async def _alc_link(self, match, message):
     await _dict_search_link(self, match, message, "alc", 1)
+
+
+async def _example_sentence_search(self, args, message, cmd, url):
+    search_args = await _dict_search_args_parse(self, args, message, cmd,
+                                                ["context"])
+    if not search_args:
+        return
+    limit, query, kwargs = search_args
+    context = kwargs["context"].lower() in ("true", "t", "yes", "y", "1") \
+        if "context" in kwargs else False
+    url = url + urllib.parse.quote(re.sub(r"\s+", "-", query), encoding="utf-8")
+    try:
+        with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                data = await response.text()
+    except Exception as e:
+        await self.send_message(message.channel, "Request failed: " + str(e))
+        return
+    tree = html.fromstring(data)
+    query = '//li[contains(@class, "sentence") and span[@class="the-sentence"]]'
+    results = tree.xpath(query)[:limit]
+    if not results:
+        sent = await self.send_message(message.channel, "No results found.")
+        if message.server:
+            await _delete_after(self, 5, [message, sent])
+        return
+
+    def sentence_text(element, class_prefix="the"):
+        nonlocal cmd
+        lst = element.xpath('span[@class="' + class_prefix + '-sentence"]')
+        return ("" if cmd == "yourei" else " ").join(
+            lst[0].xpath("text() | */text()")) if lst else ""
+
+    def result_text(element):
+        nonlocal context
+        text = sentence_text(element)
+        match = re.search(r'"([^"]*)"', tree.xpath("//script[1]/text()")[0])
+        pattern = match.group(1).replace("\\\\", "\\")
+        text = re.sub(pattern, r"**\1**", text, flags=re.I)
+        if context:
+            text = sentence_text(element, "prev") + text + sentence_text(
+                element, "next")
+        return text
+
+    await utils.send_long_message(
+        self, message.channel,
+        "\n".join([(str(index + 1) + ". " if len(
+            results) > 1 else "") + result_text(result) for index, result in
+                   enumerate(results)]),
+        message.server is not None)
+
+
+@Discordant.register_command("yourei")
+async def _yourei_search(self, args, message):
+    await _example_sentence_search(
+        self, args, message, "yourei", "http://yourei.jp/")
+
+
+@Discordant.register_command("nyanglish")
+async def _nyanglish_search(self, args, message):
+    await _example_sentence_search(
+        self, args, message, "nyanglish", "http://nyanglish.com/")
 
 
 async def _delete_after(self, time, args):
@@ -432,7 +493,8 @@ async def _userinfo(self, args, message):
     if not args:
         await self.send_message(message.channel, "!userinfo <user>")
         return
-    user = utils.get_user(args, message.server.members)
+    server = message.server if message.server else self.default_server
+    user = utils.get_user(args, server.members)
     if user is None:
         await self.send_message(message.channel, "User could not be found.")
         return

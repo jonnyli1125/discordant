@@ -128,10 +128,13 @@ class Discordant(discord.Client):
 
     async def on_error(self, event_method, *args, **kwargs):
         await super().on_error(event_method, *args, **kwargs)
-        for uid in self.controllers:
-            await self.send_message(
-                self.default_server.get_member(uid),
-                "```{}```".format(traceback.format_exc()))
+        try:
+            for uid in self.controllers:
+                await self.send_message(
+                    self.default_server.get_member(uid),
+                    "```{}```".format(traceback.format_exc()))
+        except Exception as e:
+            print("Error in on_error: " + str(e))
 
     async def load_punishment_timers(self):
         cursor = await self.mongodb.punishments.find().to_list(None)
