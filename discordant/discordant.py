@@ -109,7 +109,7 @@ class Discordant(discord.Client):
                         if "you need to wait 6 hours between bumps!" in \
                            await response.text() else "successful."
                     print("DiscordMe server bump " + output)
-            await asyncio.sleep(60 * 60 * 6 + 60)  # add 1m cuz its not perfect
+            await asyncio.sleep(60 * 60 * 6 + 60 * 5)  # 5m delay just in case
 
     async def on_ready(self):
         self.log_channel = self.get_channel(
