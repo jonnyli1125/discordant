@@ -1,4 +1,5 @@
 import asyncio
+import io
 import os
 import os.path
 import re
@@ -344,6 +345,28 @@ async def _delete_after(self, time, args):
     f = getattr(
         self, "delete_message" + ("s" if isinstance(args, list) else ""))
     await f(args)
+
+
+@Discordant.register_command("strokeorder")
+async def _stroke_order(self, args, message):
+    if not args:
+        await self.send_message(message.channel, "!strokeorder <character>")
+        return
+    file = str(ord(args[0])) + "_frames.png"
+    url = "http://classic.jisho.org/static/images/stroke_diagrams/" + file
+    try:
+        with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if response.status == 404:
+                    await self.send_message(message.channel,
+                                            args[0] + ": Kanji not found.")
+                    return
+                await self.send_file(message.channel,
+                                     io.BytesIO(await response.read()),
+                                     filename=file)
+    except Exception as e:
+        await self.send_message(message.channel, "Request failed: " + str(e))
+        return
 
 
 @Discordant.register_command("showvc")
