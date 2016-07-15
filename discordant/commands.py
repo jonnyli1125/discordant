@@ -107,8 +107,9 @@ async def _convert_timezone(self, args, message):
             output = "It is currently" + (":\n" if len(tz_strs) > 1 else " ")
         output += "\n".join([dt_format(dt, tz_str, is_t) for tz_str in tz_strs])
         await self.send_message(message.channel, output)
-    except ValueError as e:
-        await self.send_message(message.channel, str(e))
+    except ValueError:
+        await self.send_message(message.channel, split[0] +
+                                ": Not a valid time format or time zone code.")
 
 
 async def _dict_search_args_parse(self, args, message, cmd, keys=None):
