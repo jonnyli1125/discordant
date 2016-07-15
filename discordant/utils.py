@@ -10,7 +10,7 @@ def split_every(s, n):
 
 
 def is_url(s):  # good enough for now lmao
-    return re.match(r'^https?:\/\/.*', s)
+    return bool(re.match(r'^https?:\/\/.*', s))
 
 
 def long_message(output, truncate=False, max_lines=15):
@@ -54,10 +54,8 @@ def get_user(search, seq):
             return True
         if search == x.name or search == x.nick:
             return True
-        search = search.lower()
-        if x.name.lower().startswith(search):
-            return True
-        if x.nick and x.nick.lower().startswith(search):
+        temp = search.lower()
+        if temp in x.name or (x.nick and temp in x.nick):
             return True
         return False
 
