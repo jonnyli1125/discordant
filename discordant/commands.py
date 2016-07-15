@@ -74,13 +74,13 @@ async def _convert_timezone(self, args, message):
         return True
 
     def relative_date_str(dt_1, dt_2):
-        delta = (dt_2 - dt_1).days
-        if delta == 0:
-            return "same day"
-        else:
-            return "{} day{} {}".format(abs(delta),
-                                        "s" if abs(delta) != 1 else "",
-                                        "ahead" if delta > 0 else "behind")
+        delta = dt_2.day - dt_1.day
+        if delta > 1:
+            delta = -1
+        elif delta < -1:
+            delta = 1
+        return "same day" if delta == 0 else "1 day " + (
+            "ahead" if delta > 0 else "behind")
 
     def dt_format(dt, tz_str, relative):
         new_dt = dt.astimezone(get_timezone_by_code(tz_str))
