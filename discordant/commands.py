@@ -755,10 +755,11 @@ async def _ban(self, args, message):
             await self.send_message(message.channel, "Cancelled ban.")
             return
         else:
-            user = discord.Object(id=user_search)
-            user.name = user.id
-            user.discriminator = ""
-            user.server = server
+            user = discord.Member(
+                id=user_search,
+                name=user_search,
+                discriminator="",
+                server=server)
     else:
         if utils.has_permission(user, "ban_members"):
             await self.send_message(message.channel,
