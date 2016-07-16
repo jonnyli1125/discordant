@@ -755,21 +755,23 @@ async def _ban(self, args, message):
             await self.send_message(message.channel, "Cancelled ban.")
             return
         else:
-            user_id = user_search
+            user = discord.Object(id=user_search)
+            user.name = user.id
+            user.discriminator = ""
+            user.server = server
     else:
         if utils.has_permission(user, "ban_members"):
             await self.send_message(message.channel,
                                     "Cannot ban another moderator.")
             return
-        user_id = user.id
     collection = self.mongodb.punishments
-    doc = await collection.find_one({"user_id": user_id, "action": "ban"})
-    if doc:
+    doc = await collection.find_one({"user_id": user.id, "action": "ban"})
+    if doc or user in await self.get_bans(server):
         await self.send_message(
             message.channel, user.name + " is already banned.")
         return
     document = {
-        "user_id": user_id,
+        "user_id": user.id,
         "action": "ban",
         "moderator_id": message.author.id,
         "date": datetime.utcnow(),
@@ -780,8 +782,5 @@ async def _ban(self, args, message):
     await self.send_message(
         self.log_channel,
         _punishment_format(self, message.server, document))
-    # run after the output or else user data is lost
-    # self.http.ban so we can ban people who left
-    await self.http.ban(
-        user.id if user else user_id, server.id, 1)
+    await self.ban(user)
 #endregion
