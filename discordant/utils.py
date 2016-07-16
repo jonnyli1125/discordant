@@ -55,7 +55,7 @@ def get_user(search, seq):
         if search == x.name or search == x.nick:
             return True
         temp = search.lower()
-        if temp in x.name or (x.nick and temp in x.nick):
+        if temp in x.name.lower() or (x.nick and temp in x.nick.lower()):
             return True
         return False
 

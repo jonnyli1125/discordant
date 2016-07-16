@@ -780,5 +780,6 @@ async def _ban(self, args, message):
     await self.send_message(
         self.log_channel,
         _punishment_format(self, message.server, document))
-    await self.ban(user)  # run after the output or else user data is lost
+    # run after the output or else user data is lost
+    await self.http.ban(user_id, server.id, 1)  # so we can ban people who left
 #endregion
