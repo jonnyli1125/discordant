@@ -416,6 +416,55 @@ async def _reading_circle(self, args, message):
             message.channel, "!readingcircle <beginner/intermediate>")
     if message.server:
         await _delete_after(self, 5, [message, msg])
+
+
+@Discordant.register_command("tag")
+async def _tag(self, args, message):
+    collection = self.mongodb.tags
+    if not args:
+        await self.send_message(
+            message.channel,
+            "!tag <tag> [content/delete]\nTags: " +
+            ", ".join(
+                [x["tag"] for x in await collection.find().to_list(None)]))
+        return
+    split = args.split(None, 1)
+    tag = split[0]
+    content = split[1] if len(split) > 1 else None
+    query = {"tag": tag}
+    cursor = await collection.find(query).to_list(None)
+
+    def has_permission(user):
+        return cursor[0]["owner"] == user.id or \
+               utils.has_permission(user, "manage_roles")
+
+    if content == "delete":
+        if not cursor:
+            await self.send_message(message.channel, "Tag could not be found.")
+            return
+        if not has_permission(message.author):
+            await self.send_message(
+                message.channel, "You're not allowed to delete this tag.")
+            return
+        await collection.remove(query)
+        await self.send_message(message.channel, "Deleted tag: " + tag)
+    elif content:
+        if not cursor:
+            await collection.insert(
+                {"tag": tag, "content": content, "owner": message.author.id})
+            await self.send_message(message.channel, "Added tag: " + tag)
+        else:
+            if not has_permission(message.author):
+                await self.send_message(
+                    message.channel, "You're not allowed to edit this tag.")
+                return
+            await collection.update(query, {"$set": {"content": content}})
+            await self.send_message(message.channel, "Updated tag: " + tag)
+    else:
+        await self.send_message(
+            message.channel,
+            cursor[0]["content"] if cursor else "Tag could not be found")
+
 #endregion
 
 
