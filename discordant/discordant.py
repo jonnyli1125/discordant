@@ -12,7 +12,8 @@ import motor.motor_asyncio
 
 import discordant.utils as utils
 
-Command = namedtuple('Command', ['name', 'arg_func', 'aliases', 'section'])
+Command = namedtuple('Command', ['name', 'arg_func', 'aliases', 'section',
+                                 'help'])
 
 
 def decorate_all_events():
@@ -189,7 +190,9 @@ class Discordant(discord.Client):
 
             setattr(cls, func_name, func)
             cls._commands[func_name] = Command(
-                func_name, arg_func, aliases, func.__module__.split(".")[-1])
+                func_name, arg_func, aliases,
+                func.__module__.split(".")[-1],
+                utils.cmd_help_format(func.__doc__))
             # associate the given aliases with the command
             for alias in aliases:
                 if alias in cls._aliases:

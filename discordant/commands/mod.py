@@ -46,8 +46,12 @@ async def _punishment_history(self, member, cursor):
 
 @Discordant.register_command("modhistory")
 async def _moderation_history(self, args, message):
+    """!modhistory <user>
+    Displays punishment history for <user>."""
     if not args:
-        await self.send_message(message.channel, "!modhistory <user>")
+        await self.send_message(
+            message.channel,
+            utils.cmd_help_format(_moderation_history.__doc__))
         return
     server = message.server if message.server else self.default_server
     user = utils.get_user(args, server.members)
@@ -70,10 +74,7 @@ async def _mod_cmd(self, args, message, cmd, action):
                                 "You are not authorized to use this command.")
         return
     if not args:
-        await self.send_message(
-            message.channel,
-            ("!" + cmd + " <user> [reason]" +
-             " or !" + cmd + " <user> [duration=hours] [reason=str]"))
+        await self.send_message(message.channel, utils.get_cmd(self, cmd).help)
         return
     keys = ["duration", "reason"]
     kwargs = utils.get_kwargs(args, keys)
@@ -140,11 +141,15 @@ async def _mod_cmd(self, args, message, cmd, action):
 
 @Discordant.register_command("warn")
 async def _warn(self, args, message):
+    """!warn <user> [reason] or !warn <user> [duration=hours] [reason=str]
+    Warns a user."""
     await _mod_cmd(self, args, message, "warn", "warning")
 
 
 @Discordant.register_command("mute")
 async def _mute(self, args, message):
+    """!mute <user> [reason] or !mute <user> [duration=hours] [reason=str]
+    Mutes a user."""
     await _mod_cmd(self, args, message, "mute", "mute")
 
 
@@ -156,7 +161,7 @@ async def _mod_remove_cmd(self, args, message, cmd, action):
                                 "You are not authorized to use this command.")
         return
     if not args:
-        await self.send_message(message.channel, "!" + cmd + " <user> [reason]")
+        await self.send_message(message.channel, utils.get_cmd(self, cmd).help)
         return
     user_search = args.split()[0]
     reason = args[len(user_search) + 1:] if " " in args else "No reason given."
@@ -188,16 +193,22 @@ async def _mod_remove_cmd(self, args, message, cmd, action):
 
 @Discordant.register_command("unwarn")
 async def _unwarn(self, args, message):
+    """!unwarn <user> [reason]
+    Removes a warning for a user."""
     await _mod_remove_cmd(self, args, message, "unwarn", "remove warning")
 
 
 @Discordant.register_command("unmute")
 async def _unmute(self, args, message):
+    """!unmute <user> [reason]
+    Removes a mute for a user."""
     await _mod_remove_cmd(self, args, message, "unmute", "remove mute")
 
 
 @Discordant.register_command("ban")
 async def _ban(self, args, message):
+    """!ban <user/user id> [reason]
+    Bans a user."""
     server = message.server if message.server else self.default_server
     member = server.get_member(message.author.id)
     if not utils.has_permission(member, "ban_members"):
@@ -205,7 +216,8 @@ async def _ban(self, args, message):
                                 "You are not authorized to use this command.")
         return
     if not args:
-        await self.send_message(message.channel, "!ban <user> [reason]")
+        await self.send_message(message.channel,
+                                utils.cmd_help_format(_ban.__doc__))
         return
     user_search = args.split()[0]
     reason = args[len(user_search) + 1:] if " " in args else "No reason given."

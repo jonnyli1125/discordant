@@ -12,12 +12,15 @@ from discordant import Discordant
 
 @Discordant.register_command("client")
 async def _client_settings(self, args, message):
+    """!client [\*\*key=value]
+    Updates the bot's Discord client settings."""
     if message.author.id not in self.controllers:
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
     if not args:
-        await self.send_message(message.channel, "!client [*field*=value]")
+        await self.send_message(message.channel,
+                                utils.cmd_help_format(_client_settings.__doc__))
     kwargs = utils.get_kwargs(args)
     if "game" in kwargs:
         game = discord.Game(name=kwargs["game"]) if kwargs["game"] else None
@@ -45,13 +48,16 @@ async def _client_settings(self, args, message):
 
 @Discordant.register_command("say")
 async def _say(self, args, message):
+    """!say <channel> <message>
+    Sends <message> to <channel> through the bot."""
     if message.author.id not in self.controllers:
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
     split = args.split(" ")
     if len(split) <= 1:
-        await self.send_message(message.channel, "!say <channel> <message>")
+        await self.send_message(message.channel,
+                                utils.cmd_help_format(_say.__doc__))
         return
     channel_mention = split[0]
     channel = None
@@ -66,6 +72,8 @@ async def _say(self, args, message):
 
 @Discordant.register_command("edit")
 async def _edit(self, args, message):
+    """!edit <channel> <message id> <message>
+    Edit's the message in <channel> with id <message id> to <message>."""
     if message.author.id not in self.controllers:
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
@@ -73,7 +81,7 @@ async def _edit(self, args, message):
     split = args.split(" ")
     if len(split) <= 2:
         await self.send_message(message.channel,
-                                "!edit <channel> <message id> <message>")
+                                utils.cmd_help_format(_edit.__doc__))
         return
     channel_mention = split[0]
     channel = None
@@ -93,6 +101,8 @@ async def _edit(self, args, message):
 
 @Discordant.register_command("info")
 async def _stats(self, args, message):
+    """!info
+    Displays bot process info."""
     process = psutil.Process(os.getpid())
     uptime = time.time() - process.create_time()
     m, s = divmod(uptime, 60)
@@ -109,8 +119,11 @@ async def _stats(self, args, message):
 
 @Discordant.register_command("userinfo")
 async def _userinfo(self, args, message):
+    """!userinfo <user>
+    Displays Discord user info for <user>."""
     if not args:
-        await self.send_message(message.channel, "!userinfo <user>")
+        await self.send_message(message.channel,
+                                utils.cmd_help_format(_userinfo.__doc__))
         return
     server = message.server if message.server else self.default_server
     user = utils.get_user(args, server.members)

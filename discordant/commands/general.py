@@ -16,31 +16,43 @@ from discordant import Discordant
 
 @Discordant.register_command("help")
 async def _help(self, args, message):
-    section = args
-    default = "general"
-    if not section:
-        section = default
-    cmds = [cmd.aliases[0] for cmd in self._commands.values()
-            if cmd.section == section]
-    output = "Commands: " + ", ".join(cmds)
-    if not args:
-        sections = list({cmd.section + (" *(default)*"
-                        if cmd.section == default else "")
-                        for cmd in self._commands.values()})
-        output += "\n\nType !help [section] to display more commands.\n" + \
-                  "Sections: " + ", ".join(sections) + "\n\n" + \
-                  "Command help syntax:\n" + \
-                  "[] - optional argument\n" + \
-                  "<> - required argument\n" + \
-                  "* - any number of arguments\n" + \
-                  "key=value - kwargs style argument " + \
-                  "(each key-value pair is separated by space, " + \
-                  "and the key and value are separated by the \"=\" character)."
-    await self.send_message(message.channel, output.strip())
+    """!help [command]
+    Displays command help and information."""
+    if args:
+        search = utils.get_cmd(self, args)
+        await self.send_message(
+            message.channel,
+            search.help if search else "Command could not be found.")
+    else:
+        sections = {}
+        for cmd in self._commands.values():
+            if cmd.section in sections:
+                sections[cmd.section].append(cmd)
+            else:
+                sections[cmd.section] = [cmd]
+        output = "**commands**:"
+        for section, cmd_list in sections.items():
+            tab_4 = " " * 4
+            output += "\n  *{}*:\n".format(section) + \
+                      "\n".join([tab_4 + cmd.help.replace("\n", tab_4 + "\n")
+                                 for cmd in cmd_list])
+        await utils.send_long_message(self, message.author, output)
+        await self.send_message(
+            message.author,
+            "**command help syntax**:\n" +
+            "  [] - optional argument\n" +
+            "  <> - required argument\n" +
+            "  \\* - any number of arguments\n" +
+            "  key=value - kwargs style argument (each key-value pair is " +
+            "separated by space, and the key and value are separated by the " +
+            "\"=\" character).\n" +
+            "  \\*\\* - any number of kwargs")
 
 
 @Discordant.register_command("timezone")
 async def _convert_timezone(self, args, message):
+    """!timezone <time> <from> <\*to> or !timezone <\*timezone>
+    Displays time in given timezone(s)."""
     def get_timezone_by_code(code):
         code = code.upper()
         for tz_str in pytz.all_timezones:
@@ -84,7 +96,7 @@ async def _convert_timezone(self, args, message):
     if not args:
         await self.send_message(
             message.channel,
-            "!timezone <time> <from> <*to>\n!timezone <*timezone>")
+            utils.cmd_help_format(_convert_timezone.__doc__))
         return
     split = args.split()
     try:
@@ -108,11 +120,7 @@ async def _convert_timezone(self, args, message):
 
 async def _dict_search_args_parse(self, args, message, cmd, keys=None):
     if not args:
-        await self.send_message(
-            message.channel,
-            "!" + cmd + " [limit] " + "".join(
-                ["[" + key + "=value] " for key in (keys if keys else [])]) +
-            "<query>")
+        await self.send_message(message.channel, utils.get_cmd(self, cmd).help)
         return
     limit = 1
     query = args
@@ -128,6 +136,8 @@ async def _dict_search_args_parse(self, args, message, cmd, keys=None):
 
 @Discordant.register_command("jisho")
 async def _jisho_search(self, args, message):
+    """!jisho [limit] <query>
+    Searches Japanese-English dictionary ``http://jisho.org``."""
     search_args = await _dict_search_args_parse(self, args, message, "jisho")
     if not search_args:
         return
@@ -195,6 +205,8 @@ async def _jisho_search(self, args, message):
 
 @Discordant.register_command("alc")
 async def _alc_search(self, args, message):
+    """!alc [limit] <query>
+    Searches English-Japanese dictionary ``http://alc.co.jp``."""
     search_args = await _dict_search_args_parse(self, args, message, "alc")
     if not search_args:
         return
@@ -320,17 +332,21 @@ async def _example_sentence_search(self, args, message, cmd, url):
 
 @Discordant.register_command("yourei")
 async def _yourei_search(self, args, message):
+    """!yourei [limit] <query> [context=bool]
+    Searches Japanese example sentences from ``http://yourei.jp``."""
     await _example_sentence_search(
         self, args, message, "yourei", "http://yourei.jp/")
 
 
 @Discordant.register_command("nyanglish")
 async def _nyanglish_search(self, args, message):
+    """!nyanglish [limit] <query> [context=bool]
+    Searches English example sentences from ``http://nyanglish.com``."""
     await _example_sentence_search(
         self, args, message, "nyanglish", "http://nyanglish.com/")
 
 
-@Discordant.register_handler(r"http:\/\/(yourei\.jp|nyanglish\.com)\/(\S*)")
+@Discordant.register_handler(r"http:\/\/(yourei\.jp|nyanglish\.com)\/(\S+)")
 async def _yourei_link(self, match, message):
     await _dict_search_link(
         self, match, message, match.group(1).split(".")[0], 2)
@@ -344,8 +360,11 @@ async def _delete_after(self, time, args):
 
 @Discordant.register_command("strokeorder")
 async def _stroke_order(self, args, message):
+    """!strokeorder <character>
+    Shows stroke order for a kanji character."""
     if not args:
-        await self.send_message(message.channel, "!strokeorder <character>")
+        await self.send_message(message.channel,
+                                utils.cmd_help_format(_stroke_order.__doc__))
         return
     file = str(ord(args[0])) + "_frames.png"
     url = "http://classic.jisho.org/static/images/stroke_diagrams/" + file
@@ -366,6 +385,8 @@ async def _stroke_order(self, args, message):
 
 @Discordant.register_command("showvc")
 async def _show_voice_channels_toggle(self, args, message):
+    """!showvc
+    Toggles visibility to the #voice-\* text channels."""
     query = {"user_id": message.author.id}
     collection = self.mongodb.always_show_vc
     cursor = await collection.find(query).to_list(None)
@@ -393,6 +414,9 @@ async def _show_voice_channels_toggle(self, args, message):
 
 @Discordant.register_command("readingcircle")
 async def _reading_circle(self, args, message):
+    """!readingcircle <beginner/intermediate>
+    Add/remove yourself to ping notification lists for beginner or intermediate
+    reading circles."""
     try:
         author = message.author if message.server \
             else self.default_server.get_member(message.author.id)
@@ -414,11 +438,13 @@ async def _reading_circle(self, args, message):
 
 @Discordant.register_command("tag")
 async def _tag(self, args, message):
+    """!tag <tag> [content/delete]
+    Display, add, edit, or delete tags (text stored in the bot's database)."""
     collection = self.mongodb.tags
     if not args:
         await self.send_message(
             message.channel,
-            "!tag <tag> [content/delete]\nTags: " +
+            utils.cmd_help_format(_tag.__doc__) + "\nTags: " +
             ", ".join(
                 [x["tag"] for x in await collection.find().to_list(None)]))
         return

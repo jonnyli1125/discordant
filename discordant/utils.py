@@ -16,7 +16,7 @@ def is_url(s):  # good enough for now lmao
 def long_message(output, truncate=False, max_lines=15):
     output = output.strip()
     return ["\n".join(output.split("\n")[:max_lines]) +
-            "\n... *Search results truncated. " +
+            "\n... *Message truncated. " +
             "Send me a command over PM to show more!*"] \
         if truncate and output.count("\n") > max_lines \
         else split_every(output, 2000)
@@ -115,3 +115,15 @@ def action_to_role(self, action):
 def has_permission(user, permission):
     return len(
         [x for x in user.roles if getattr(x.permissions, permission)]) > 0
+
+
+def get_cmd(self, cmd_name):
+    return discord.utils.find(
+        lambda cmd: cmd.aliases[0] == cmd_name,
+        self._commands.values())
+
+
+def cmd_help_format(cmd):
+    split = [s.strip() for s in
+             (cmd if isinstance(cmd, str) else cmd.help).split("\n", 1)]
+    return split[0] + " - " + split[1].replace("\n", " ").replace("\\n", "\n")
