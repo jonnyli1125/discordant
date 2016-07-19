@@ -2,7 +2,6 @@ import asyncio
 import json
 import re
 import sys
-import traceback
 from collections import namedtuple
 from inspect import iscoroutinefunction
 from os import path
@@ -16,12 +15,24 @@ import discordant.utils as utils
 Command = namedtuple('Command', ['name', 'arg_func', 'aliases', 'section'])
 
 
+def decorate_all_events():
+    def wrapper(cls):
+        for name, obj in vars(cls).items():
+            if iscoroutinefunction(obj) and name.startswith("on_"):
+                setattr(cls, name, cls.event_dispatch(obj))
+        return cls
+
+    return wrapper
+
+
+@decorate_all_events()
 class Discordant(discord.Client):
     _CMD_NAME_REGEX = re.compile(r'[a-z0-9]+')
     _handlers = {}
     _commands = {}
     _aliases = {}
     _triggers = set()
+    _events = {}
 
     def __init__(self, config_file='config.json'):
         super().__init__()
@@ -83,33 +94,18 @@ class Discordant(discord.Client):
                 self._aliases[alias] = cmd_name
                 self._commands[cmd_name].aliases.append(alias)
 
-    async def discordme_bump(self):
-        cfg = self.config["api-keys"]["discordme"]
-        while True:
-            with aiohttp.ClientSession() as session:
-                async with session.post(
-                        "https://discord.me/signin",
-                        data=cfg["login"]
-                ) as response:
-                    if not response.status == 200:
-                        print("DiscordMe login request failed.")
-                        return
-                    if '<li><a href="/logout">LOGOUT</a></li>' not in \
-                            await response.text():
-                        print("DiscordMe login credentials incorrect.")
-                        return
-                async with session.get(
-                                "https://discord.me/server/bump/" +
-                                cfg["bump_id"]
-                ) as response:
-                    if not response.status == 200:
-                        print("DiscordMe bump request failed.")
-                        return
-                    output = "failed: Already bumped within the last 6 hours." \
-                        if "you need to wait 6 hours between bumps!" in \
-                           await response.text() else "successful."
-                    print("DiscordMe server bump " + output)
-            await asyncio.sleep(60 * 60 * 6 + 60 * 5)  # 5m delay just in case
+    async def on_error(self, event_method, *args, **kwargs):
+        import traceback
+        await super().on_error(event_method, *args, **kwargs)
+        # have to put this here cuz traceback.format_exc wont work otherwise
+        try:
+            for uid in self.controllers:
+                await self.send_message(
+                    self.default_server.get_member(uid),
+                    "```{}```".format(traceback.format_exc()))
+        except:
+            print("Error in on_error:\n" + traceback.format_exc(),
+                  file=sys.stderr)
 
     async def on_ready(self):
         self.log_channel = self.get_channel(
@@ -120,123 +116,6 @@ class Discordant(discord.Client):
         await self.change_status(
             game=discord.Game(name=self.config["client"]["game"])
             if self.config["client"]["game"] else None)
-        await self.load_voice_roles()
-        coros = [self.load_punishment_timers()]
-        if self.config["api-keys"]["discordme"]["login"]["username"]:
-            coros.append(self.discordme_bump())
-        await asyncio.gather(*coros)
-
-    async def on_error(self, event_method, *args, **kwargs):
-        await super().on_error(event_method, *args, **kwargs)
-        try:
-            for uid in self.controllers:
-                await self.send_message(
-                    self.default_server.get_member(uid),
-                    "```{}```".format(traceback.format_exc()))
-        except Exception as e:
-            print("Error in on_error: " + str(e))
-
-    async def load_punishment_timers(self):
-        cursor = await self.mongodb.punishments.find().to_list(None)
-        to_remove = {}
-        timers = []
-        for document in reversed(cursor):
-            action = document["action"]
-            if action == "ban" or action.startswith("removed"):
-                continue
-            member = self.default_server.get_member(document["user_id"])
-            if not member:
-                continue
-            role = utils.action_to_role(self, action)
-            if await utils.is_punished(self, member, action):
-                print("Adding punishment timer for {}#{}".format(
-                    member.name, member.discriminator))
-                timers.append(self.add_punishment_timer(
-                    member, action))
-            elif role in member.roles:
-                if member.id not in to_remove:
-                    to_remove[member.id] = []
-                to_remove[member.id].append(role)
-        await asyncio.gather(*timers)
-        for uid, roles in to_remove.items():
-            member = self.default_server.get_member(uid)
-            await asyncio.sleep(1)
-            await self.remove_roles(member, *roles)
-            print("Removed punishments for {}#{}: {}".format(
-                member.name,
-                member.discriminator,
-                ", ".join([x.name for x in roles])))
-
-    async def add_punishment_timer(self, member, action):
-        role = utils.action_to_role(self, action)
-        while True:
-            punished = await utils.is_punished(self, member, action)
-            if not punished:
-                print("Removing punishment for {}#{}".format(
-                    member.name, member.discriminator))
-                await self.remove_roles(member, role)
-                break
-            await asyncio.sleep(
-                self.config["moderation"]["punishment_check_rate"])
-
-    async def on_member_join(self, member):
-        if await utils.is_punished(self, member):
-            await self.send_message(
-                self.staff_channel,
-                "Punished user {}#{} ({}) joined the server.".format(
-                    member.name, member.discriminator, member.id))
-            if await utils.is_punished(self, member, "ban"):
-                await self.ban(member)
-            else:
-                to_add = []
-                timers = []
-                for action in ["warning", "mute"]:
-                    if await utils.is_punished(self, member, action):
-                        to_add.append(utils.action_to_role(self, action))
-                        timers.append(self.add_punishment_timer(member, action))
-                if to_add:
-                    await asyncio.gather(self.add_roles(member, *to_add),
-                                         *timers)
-
-    async def on_member_leave(self, member):
-        if await utils.is_punished(self, member):
-            await self.send_message(
-                self.staff_channel,
-                "Punished user {}#{} ({}) left the server.".format(
-                    member.name, member.discriminator, member.id))
-
-    async def load_voice_roles(self):
-        voice_role = discord.utils.get(self.default_server.roles, name="Voice")
-        for member in [x for x in self.default_server.members
-                       if x.voice_channel or voice_role in x.roles]:
-            await asyncio.sleep(1)  # avoid rate limit
-            await self._update_voice_roles(member, voice_role)
-        cursor = await self.mongodb.always_show_vc.find().to_list(None)
-        for doc in cursor:
-            member = self.default_server.get_member(doc["user_id"])
-            if not member:
-                continue
-            show_vc_role = discord.utils.get(
-                self.default_server.roles, name="VC Shown")
-            f = getattr(self, ("add" if doc["value"] else "remove") + "_roles")
-            await asyncio.sleep(1)
-            await f(member, show_vc_role)
-
-    async def _update_voice_roles(self, member, *roles):
-        in_voice = bool(member.voice_channel) and \
-                   member.voice_channel != member.server.afk_channel
-        f = getattr(self, ("add" if in_voice else "remove") + "_roles")
-        await f(member, *roles)
-
-    async def on_voice_state_update(self, before, after):
-        if before.voice_channel != after.voice_channel:
-            roles = [discord.utils.get(after.server.roles, name="Voice")]
-            doc = await self.mongodb.always_show_vc.find_one(
-                {"user_id": after.id})
-            if not doc or not doc["value"]:
-                roles.append(
-                    discord.utils.get(after.server.roles, name="VC Shown"))
-            await self._update_voice_roles(after, *roles)
 
     async def on_message(self, message):
         # TODO: logging
@@ -293,8 +172,7 @@ class Discordant(discord.Client):
         return wrapper
 
     @classmethod
-    def register_command(cls, name, aliases=None, arg_func=lambda args: args,
-                         section="general"):
+    def register_command(cls, name, aliases=None, arg_func=lambda args: args):
         if aliases is None:
             aliases = []
         aliases.append(name)
@@ -311,7 +189,7 @@ class Discordant(discord.Client):
 
             setattr(cls, func_name, func)
             cls._commands[func_name] = Command(
-                func_name, arg_func, aliases, section)
+                func_name, arg_func, aliases, func.__module__.split(".")[-1])
             # associate the given aliases with the command
             for alias in aliases:
                 if alias in cls._aliases:
@@ -325,5 +203,49 @@ class Discordant(discord.Client):
                            ' letters or numbers.'))
                     sys.exit(-1)
                 cls._aliases[alias] = func_name
+
+        return wrapper
+
+    @classmethod
+    def register_event(cls, name):
+        name = "on_" + name
+
+        def wrapper(func):
+            if not iscoroutinefunction(func):
+                print('Handler for event "{}" must be a coroutine'.format(name))
+                sys.exit(-1)
+
+            async def dummy(self, *args, **kwargs):
+                f = getattr(super(), name, None)
+                if f:
+                    return await f(*args, **kwargs)
+
+            dummy.__name__ = name
+
+            if name not in Discordant.__dict__:
+                setattr(cls, name, cls.event_dispatch(dummy))
+
+            func_name = '_evt_' + func.__name__
+            while func_name in cls._commands:
+                func_name += '_'
+
+            setattr(cls, func_name, func)
+            if name in cls._events:
+                cls._events[name].append(func)
+            else:
+                cls._events[name] = [func]
+
+        return wrapper
+
+    @classmethod
+    def event_dispatch(cls, func):
+        async def wrapper(*args, **kwargs):
+            # only add large timers/loops through events,
+            # not in Discordant methods.
+            await func(*args, **kwargs)
+            func_name = func.__name__
+            if func_name in cls._events:
+                await asyncio.gather(
+                    *[f(*args, **kwargs) for f in cls._events[func_name]])
 
         return wrapper
