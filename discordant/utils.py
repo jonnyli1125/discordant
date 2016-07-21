@@ -125,5 +125,5 @@ def get_cmd(self, cmd_name):
 
 def cmd_help_format(cmd):
     split = [s.strip() for s in
-             (cmd if isinstance(cmd, str) else cmd.help).split("\n", 1)]
-    return split[0] + " - " + split[1].replace("\n", " ").replace("\\n", "\n")
+             (cmd if isinstance(cmd, str) else cmd.help).split("\n")]
+    return split[0] + " - " + " ".join(split[1:]).replace("\\n", "\n")
