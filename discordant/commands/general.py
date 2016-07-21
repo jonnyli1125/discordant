@@ -17,7 +17,7 @@ from discordant import Discordant
 @Discordant.register_command("help")
 async def _help(self, args, message):
     """!help [command]
-    Displays command help and information."""
+    displays command help and information."""
     if args:
         search = utils.get_cmd(self, args)
         await self.send_message(
@@ -33,9 +33,10 @@ async def _help(self, args, message):
         output = "**commands**:"
         for section, cmd_list in sections.items():
             tab_4 = " " * 4
-            output += "\n  *{}*:\n".format(section) + \
-                      "\n".join([tab_4 + cmd.help.replace("\n", tab_4 + "\n")
-                                 for cmd in cmd_list])
+            output += "\n  __{}__:\n".format(section) + \
+                      "\n".join([tab_4 + "*{}* - ".format(cmd.aliases[0]) +
+                                 cmd.help.replace("\n", tab_4 + "\n").split(
+                                     " - ", 1)[1] for cmd in cmd_list])
         await utils.send_long_message(self, message.author, output)
         await self.send_message(
             message.author,
@@ -52,7 +53,7 @@ async def _help(self, args, message):
 @Discordant.register_command("timezone")
 async def _convert_timezone(self, args, message):
     """!timezone <time> <from> <\*to> or !timezone <\*timezone>
-    Displays time in given timezone(s)."""
+    displays time in given timezone(s)."""
     def get_timezone_by_code(code):
         code = code.upper()
         for tz_str in pytz.all_timezones:
@@ -137,7 +138,7 @@ async def _dict_search_args_parse(self, args, message, cmd, keys=None):
 @Discordant.register_command("jisho")
 async def _jisho_search(self, args, message):
     """!jisho [limit] <query>
-    Searches Japanese-English dictionary ``http://jisho.org``."""
+    searches japanese-english dictionary ``http://jisho.org``."""
     search_args = await _dict_search_args_parse(self, args, message, "jisho")
     if not search_args:
         return
@@ -206,7 +207,7 @@ async def _jisho_search(self, args, message):
 @Discordant.register_command("alc")
 async def _alc_search(self, args, message):
     """!alc [limit] <query>
-    Searches English-Japanese dictionary ``http://alc.co.jp``."""
+    searches english-japanese dictionary ``http://alc.co.jp``."""
     search_args = await _dict_search_args_parse(self, args, message, "alc")
     if not search_args:
         return
@@ -341,7 +342,7 @@ async def _yourei_search(self, args, message):
 @Discordant.register_command("nyanglish")
 async def _nyanglish_search(self, args, message):
     """!nyanglish [limit] <query> [context=bool]
-    Searches English example sentences from ``http://nyanglish.com``."""
+    searches english example sentences from ``http://nyanglish.com``."""
     await _example_sentence_search(
         self, args, message, "nyanglish", "http://nyanglish.com/")
 
@@ -361,7 +362,7 @@ async def _delete_after(self, time, args):
 @Discordant.register_command("strokeorder")
 async def _stroke_order(self, args, message):
     """!strokeorder <character>
-    Shows stroke order for a kanji character."""
+    shows stroke order for a kanji character."""
     if not args:
         await self.send_message(message.channel,
                                 utils.cmd_help_format(_stroke_order.__doc__))
@@ -386,7 +387,7 @@ async def _stroke_order(self, args, message):
 @Discordant.register_command("showvc")
 async def _show_voice_channels_toggle(self, args, message):
     """!showvc
-    Toggles visibility to the #voice-\* text channels."""
+    toggles visibility to the #voice-\* text channels."""
     query = {"user_id": message.author.id}
     collection = self.mongodb.always_show_vc
     cursor = await collection.find(query).to_list(None)
@@ -415,7 +416,7 @@ async def _show_voice_channels_toggle(self, args, message):
 @Discordant.register_command("readingcircle")
 async def _reading_circle(self, args, message):
     """!readingcircle <beginner/intermediate>
-    Add/remove yourself to ping notification lists for beginner or intermediate
+    add/remove yourself to ping notification lists for beginner or intermediate
     reading circles."""
     try:
         author = message.author if message.server \
@@ -439,7 +440,7 @@ async def _reading_circle(self, args, message):
 @Discordant.register_command("tag")
 async def _tag(self, args, message):
     """!tag <tag> [content/delete]
-    Display, add, edit, or delete tags (text stored in the bot's database)."""
+    display, add, edit, or delete tags (text stored in the bot's database)."""
     collection = self.mongodb.tags
     if not args:
         await self.send_message(

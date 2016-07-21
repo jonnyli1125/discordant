@@ -47,7 +47,7 @@ async def _punishment_history(self, member, cursor):
 @Discordant.register_command("modhistory")
 async def _moderation_history(self, args, message):
     """!modhistory <user>
-    Displays punishment history for <user>."""
+    displays punishment history for a user."""
     if not args:
         await self.send_message(
             message.channel,
@@ -142,14 +142,14 @@ async def _mod_cmd(self, args, message, cmd, action):
 @Discordant.register_command("warn")
 async def _warn(self, args, message):
     """!warn <user> [reason] or !warn <user> [duration=hours] [reason=str]
-    Warns a user."""
+    warns a user."""
     await _mod_cmd(self, args, message, "warn", "warning")
 
 
 @Discordant.register_command("mute")
 async def _mute(self, args, message):
     """!mute <user> [reason] or !mute <user> [duration=hours] [reason=str]
-    Mutes a user."""
+    mutes a user."""
     await _mod_cmd(self, args, message, "mute", "mute")
 
 
@@ -194,21 +194,21 @@ async def _mod_remove_cmd(self, args, message, cmd, action):
 @Discordant.register_command("unwarn")
 async def _unwarn(self, args, message):
     """!unwarn <user> [reason]
-    Removes a warning for a user."""
+    removes a warning for a user."""
     await _mod_remove_cmd(self, args, message, "unwarn", "remove warning")
 
 
 @Discordant.register_command("unmute")
 async def _unmute(self, args, message):
     """!unmute <user> [reason]
-    Removes a mute for a user."""
+    removes a mute for a user."""
     await _mod_remove_cmd(self, args, message, "unmute", "remove mute")
 
 
 @Discordant.register_command("ban")
 async def _ban(self, args, message):
     """!ban <user/user id> [reason]
-    Bans a user."""
+    bans a user."""
     server = message.server if message.server else self.default_server
     member = server.get_member(message.author.id)
     if not utils.has_permission(member, "ban_members"):

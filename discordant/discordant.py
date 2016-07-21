@@ -49,6 +49,7 @@ class Discordant(discord.Client):
         self.commands_parsed = 0
         self.log_channel = None
         self.staff_channel = None
+        self.testing_channel = None
 
         self.load_config(config_file)
 
@@ -113,6 +114,8 @@ class Discordant(discord.Client):
             self.config["moderation"]["log_channel"])
         self.staff_channel = self.get_channel(
             self.config["moderation"]["staff_channel"])
+        self.testing_channel = self.get_channel(
+            self.config["client"]["testing_channel"])
         self.default_server = self.log_channel.server
         await self.change_status(
             game=discord.Game(name=self.config["client"]["game"])

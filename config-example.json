@@ -23,7 +23,8 @@
 	},
 	"client": {
 		"game": "example game name",
-		"controllers": ["<user id>"]
+		"controllers": ["<user id>"],
+		"testing_channel": "<channel id>"
 	},
 	"moderation": {
 		"warn_duration": 336,

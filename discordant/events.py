@@ -1,4 +1,5 @@
 import asyncio
+import sys
 
 import aiohttp
 import discord
@@ -144,7 +145,6 @@ async def on_member_leave(self, member):
 
 @Discordant.register_event("voice_state_update")
 async def on_voice_state_update(self, before, after):
-    print("test")
     if before.voice_channel != after.voice_channel:
         roles = [discord.utils.get(after.server.roles, name="Voice")]
         doc = await self.mongodb.always_show_vc.find_one(
@@ -155,5 +155,26 @@ async def on_voice_state_update(self, before, after):
         await _update_voice_roles(self, after, *roles)
 
 
+@Discordant.register_event("ready")
 async def stats_fetch_logs(self):
-    pass
+    collection = self.mongodb.logs
+    logs = []
+    for channel in self.default_server.channels:
+        if channel == self.staff_channel or channel == self.testing_channel:
+            continue
+        search = await collection.find_one({
+            "$query": {"channel_id": channel.id},
+            "$orderby": {"$natural": -1}
+        })
+        limit, after = (sys.maxsize, await self.get_message(
+            channel, search["message_id"])) if search else (100, None)
+        async for message in self.logs_from(channel, limit, after=after):
+            logs.append({
+                "message_id": message.id,
+                "author_id": message.author.id,
+                "channel_id": message.channel.id,
+                "timestamp": message.timestamp,
+                "content": message.clean_content
+            })
+    await collection.insert(sorted(logs, key=lambda x: x["timestamp"]))
+    print("Updated stats logs: {} messages inserted.".format(len(logs)))
