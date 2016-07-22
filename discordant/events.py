@@ -15,25 +15,6 @@ async def _update_voice_roles(self, member, *roles):
     await f(member, *roles)
 
 
-@Discordant.register_event("ready")
-async def load_voice_roles(self):
-    voice_role = discord.utils.get(self.default_server.roles, name="Voice")
-    for member in [x for x in self.default_server.members
-                   if x.voice_channel or voice_role in x.roles]:
-        await asyncio.sleep(1)  # avoid rate limit
-        await _update_voice_roles(self, member, voice_role)
-    cursor = await self.mongodb.always_show_vc.find().to_list(None)
-    for doc in cursor:
-        member = self.default_server.get_member(doc["user_id"])
-        if not member:
-            continue
-        show_vc_role = discord.utils.get(
-            self.default_server.roles, name="VC Shown")
-        f = getattr(self, ("add" if doc["value"] else "remove") + "_roles")
-        await asyncio.sleep(1)
-        await f(member, show_vc_role)
-
-
 async def add_punishment_timer(self, member, action):
     role = utils.action_to_role(self, action)
     while True:
