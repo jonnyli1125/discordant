@@ -47,8 +47,16 @@ async def add_punishment_timer(self, member, action):
             self.config["moderation"]["punishment_check_rate"])
 
 
+_load_punishment_timers = False
+
+
 @Discordant.register_event("ready")
 async def load_punishment_timers(self):
+    global _load_punishment_timers
+    if not _load_punishment_timers:
+        _load_punishment_timers = True
+    else:
+        return
     cursor = await self.mongodb.punishments.find().to_list(None)
     to_remove = {}
     timers = []
@@ -79,8 +87,16 @@ async def load_punishment_timers(self):
             ", ".join([x.name for x in roles])))
 
 
+_discordme_bump = False
+
+
 @Discordant.register_event("ready")
 async def discordme_bump(self):
+    global _discordme_bump
+    if not _discordme_bump:
+        _discordme_bump = True
+    else:
+        return
     cfg = self.config["api-keys"]["discordme"]
     if not cfg["login"]["username"]:
         return
@@ -176,5 +192,6 @@ async def stats_fetch_logs(self):
                 "timestamp": message.timestamp,
                 "content": message.clean_content
             })
-    await collection.insert(sorted(logs, key=lambda x: x["timestamp"]))
+    if logs:
+        await collection.insert(sorted(logs, key=lambda x: x["timestamp"]))
     print("Updated stats logs: {} messages inserted.".format(len(logs)))
