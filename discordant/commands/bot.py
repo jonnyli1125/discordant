@@ -19,8 +19,7 @@ async def _client_settings(self, args, message):
                                 "You are not authorized to use this command.")
         return
     if not args:
-        await self.send_message(message.channel,
-                                utils.cmd_help_format(_client_settings.__doc__))
+        await utils.send_help(self, message, "client")
     kwargs = utils.get_kwargs(args)
     if "game" in kwargs:
         game = discord.Game(name=kwargs["game"]) if kwargs["game"] else None
@@ -56,8 +55,7 @@ async def _say(self, args, message):
         return
     split = args.split(None, 1)
     if len(split) <= 1:
-        await self.send_message(message.channel,
-                                utils.cmd_help_format(_say.__doc__))
+        await utils.send_help(self, message, "say")
         return
     channel = discord.utils.get(message.channel_mentions, mention=split[0])
     if not channel:
@@ -76,8 +74,7 @@ async def _edit(self, args, message):
         return
     split = args.split(None, 2)
     if len(split) <= 2:
-        await self.send_message(message.channel,
-                                utils.cmd_help_format(_edit.__doc__))
+        await utils.send_help(self, message, "edit")
         return
     channel = discord.utils.get(message.channel_mentions, mention=split[0])
     if not channel:
@@ -113,8 +110,7 @@ async def _userinfo(self, args, message):
     """!userinfo <user>
     displays discord user info for a user."""
     if not args:
-        await self.send_message(message.channel,
-                                utils.cmd_help_format(_userinfo.__doc__))
+        await utils.send_help(self, message, "userinfo")
         return
     server = message.server if message.server else self.default_server
     user = utils.get_user(args, server.members)
@@ -123,7 +119,7 @@ async def _userinfo(self, args, message):
         return
     await self.send_message(
         message.channel,
-        ("**name**: {0.name}#{0.discriminator}\n" +
+        ("**name**: {0}\n" +
          "**id**: {0.id}\n" +
          "**account created**: {0.created_at}\n" +
          "**joined server**: {0.joined_at}\n" +

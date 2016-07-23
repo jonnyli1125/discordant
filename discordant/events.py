@@ -15,19 +15,6 @@ async def _update_voice_roles(self, member, *roles):
     await f(member, *roles)
 
 
-async def add_punishment_timer(self, member, action):
-    role = utils.action_to_role(self, action)
-    while True:
-        punished = await utils.is_punished(self, member, action)
-        if not punished:
-            print("Removing punishment for {}#{}".format(
-                member.name, member.discriminator))
-            await self.remove_roles(member, role)
-            break
-        await asyncio.sleep(
-            self.config["moderation"]["punishment_check_rate"])
-
-
 _load_punishment_timers = False
 
 
@@ -50,9 +37,8 @@ async def load_punishment_timers(self):
             continue
         role = utils.action_to_role(self, action)
         if await utils.is_punished(self, member, action):
-            print("Adding punishment timer for {}#{}".format(
-                member.name, member.discriminator))
-            timers.append(add_punishment_timer(self, member, action))
+            print("Adding punishment timer for " + str(member))
+            timers.append(utils.add_punishment_timer(self, member, action))
         elif role in member.roles:
             if member.id not in to_remove:
                 to_remove[member.id] = []
@@ -62,9 +48,8 @@ async def load_punishment_timers(self):
         member = self.default_server.get_member(uid)
         await asyncio.sleep(1)
         await self.remove_roles(member, *roles)
-        print("Removed punishments for {}#{}: {}".format(
-            member.name,
-            member.discriminator,
+        print("Removed punishments for {}: {}".format(
+            str(member),
             ", ".join([x.name for x in roles])))
 
 
@@ -113,9 +98,7 @@ async def on_member_join(self, member):
     if await utils.is_punished(self, member):
         await self.send_message(
             self.staff_channel,
-            "Punished user " +
-            "{0.name}#{0.discriminator} ({0.id}) joined the server.".format(
-                member))
+            "Punished user {0} ({0.id}) joined the server.".format(member))
         if await utils.is_punished(self, member, "ban"):
             await self.ban(member)
         else:
@@ -124,7 +107,8 @@ async def on_member_join(self, member):
             for action in ["warning", "mute"]:
                 if await utils.is_punished(self, member, action):
                     to_add.append(utils.action_to_role(self, action))
-                    timers.append(add_punishment_timer(self, member, action))
+                    timers.append(utils.add_punishment_timer(
+                        self, member, action))
             if to_add:
                 await asyncio.gather(self.add_roles(member, *to_add),
                                      *timers)
@@ -135,25 +119,24 @@ async def on_member_leave(self, member):
     if await utils.is_punished(self, member):
         await self.send_message(
             self.staff_channel,
-            "Punished user " +
-            "{0.name}#{0.discriminator} ({0.id}) left the server.".format(
-                member))
+            "Punished user {0} ({0.id}) left the server.".format(member))
 
 
 @Discordant.register_event("voice_state_update")
 async def on_voice_state_update(self, before, after):
     if before.voice_channel != after.voice_channel:
         roles = [discord.utils.get(after.server.roles, name="Voice")]
-        doc = await self.mongodb.always_show_vc.find_one(
-            {"user_id": after.id})
+        doc = await self.mongodb.always_show_vc.find_one({"user_id": after.id})
         if not doc or not doc["value"]:
-            roles.append(
-                discord.utils.get(after.server.roles, name="VC Shown"))
+            roles.append(discord.utils.get(after.server.roles, name="VC Shown"))
         await _update_voice_roles(self, after, *roles)
 
 
 @Discordant.register_event("ready")
 async def stats_fetch_logs(self):
+    if not self.user.bot:
+        print("Stats logs cannot be fetched: please run through a bot account.")
+        return
     collection = self.mongodb.logs
     logs = []
     for channel in self.default_server.channels:
@@ -176,3 +159,16 @@ async def stats_fetch_logs(self):
     if logs:
         await collection.insert(sorted(logs, key=lambda x: x["timestamp"]))
     print("Updated stats logs: {} messages inserted.".format(len(logs)))
+
+
+async def stats_fetch_type(self, name, collection, keys):
+    collection = self.mongodb[name + "s"]
+    data = []
+    for obj in collection:
+        if obj == self.staff_channel or obj == self.testing_channel:
+            continue
+
+
+@Discordant.register_event("ready")
+async def stats_fetch_members(self):
+    pass

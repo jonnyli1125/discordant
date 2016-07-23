@@ -19,10 +19,10 @@ async def _help(self, args, message):
     """!help [command]
     displays command help and information."""
     if args:
-        search = utils.get_cmd(self, args)
-        await self.send_message(
-            message.channel,
-            search.help if search else "Command could not be found.")
+        try:
+            await utils.send_help(self, message, args)
+        except:
+            await self.send_message("Command could not be found.")
     else:
         sections = {}
         for cmd in self._commands.values():
@@ -95,9 +95,7 @@ async def _convert_timezone(self, args, message):
             ", " + relative_date_str(dt, new_dt) if relative else "")
 
     if not args:
-        await self.send_message(
-            message.channel,
-            utils.cmd_help_format(_convert_timezone.__doc__))
+        await utils.send_help(self, message, "timezone")
         return
     split = args.split()
     try:
@@ -121,7 +119,7 @@ async def _convert_timezone(self, args, message):
 
 async def _dict_search_args_parse(self, args, message, cmd, keys=None):
     if not args:
-        await self.send_message(message.channel, utils.get_cmd(self, cmd).help)
+        await utils.send_help(self, message, cmd)
         return
     limit = 1
     query = args
@@ -266,7 +264,7 @@ async def _alc_search(self, args, message):
 
 
 async def _dict_search_link(self, match, message, cmd, group):
-    await getattr(self, self._commands[self._aliases[cmd]].name)(
+    await getattr(self, utils.get_cmd(self, cmd).name)(
         urllib.parse.unquote(match.group(group), encoding="utf-8"), message)
 
 
@@ -364,8 +362,7 @@ async def _stroke_order(self, args, message):
     """!strokeorder <character>
     shows stroke order for a kanji character."""
     if not args:
-        await self.send_message(message.channel,
-                                utils.cmd_help_format(_stroke_order.__doc__))
+        await utils.send_help(self, message, "strokeorder")
         return
     file = str(ord(args[0])) + "_frames.png"
     url = "http://classic.jisho.org/static/images/stroke_diagrams/" + file
@@ -445,7 +442,7 @@ async def _tag(self, args, message):
     if not args:
         await self.send_message(
             message.channel,
-            utils.cmd_help_format(_tag.__doc__) + "\nTags: " +
+            utils.cmd_help_format(utils.get_cmd(self, "tag")) + "\nTags: " +
             ", ".join(
                 [x["tag"] for x in await collection.find().to_list(None)]))
         return

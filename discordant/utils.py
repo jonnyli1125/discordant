@@ -1,3 +1,4 @@
+import asyncio
 import re
 import shlex
 from datetime import datetime
@@ -50,7 +51,7 @@ def get_user(search, seq):
         nonlocal search
         if search == x.mention:
             return True
-        if search == x.name + "#" + x.discriminator:
+        if search == str(x):
             return True
         if search == x.name or search == x.nick:
             return True
@@ -101,6 +102,18 @@ async def _is_punished(cursor, action):
         return discord.utils.find(g, cursor) is None
 
 
+async def add_punishment_timer(self, member, action):
+    role = action_to_role(self, action)
+    while True:
+        punished = await is_punished(self, member, action)
+        if not punished:
+            print("Removing punishment for " + str(member))
+            await self.remove_roles(member, role)
+            break
+        await asyncio.sleep(
+            self.config["moderation"]["punishment_check_rate"])
+
+
 def action_to_role(self, action):
     dct = {
         "warning": "Warned",
@@ -118,12 +131,17 @@ def has_permission(user, permission):
 
 
 def get_cmd(self, cmd_name):
-    return discord.utils.find(
-        lambda cmd: cmd.aliases[0] == cmd_name,
-        self._commands.values())
+    return self._commands[self._aliases[cmd_name]]
 
 
 def cmd_help_format(cmd):
-    split = [s.strip() for s in
-             (cmd if isinstance(cmd, str) else cmd.help).split("\n")]
-    return split[0] + " - " + " ".join(split[1:]).replace("\\n", "\n")
+    if isinstance(cmd, str):
+        split = [s.strip() for s in cmd.split("\n")]
+        return split[0] + " - " + " ".join(split[1:]).replace("\\n", "\n")
+    else:
+        return cmd.help
+
+
+async def send_help(self, message, cmd_name):
+    await self.send_message(message.channel, cmd_help_format(get_cmd(
+        self, cmd_name)))

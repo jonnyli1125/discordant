@@ -12,11 +12,10 @@ def _punishment_format(self, server, document):
     if "user" not in document:
         user_id = document["user_id"]
         user = server.get_member(user_id)
-        document["user"] = user.name + "#" + user.discriminator \
-            if user else user_id
+        document["user"] = str(user) if user else user_id
     if "moderator" not in document:
         moderator = server.get_member(document["moderator_id"])
-        document["moderator"] = moderator.name + "#" + moderator.discriminator
+        document["moderator"] = str(moderator)
     document["date"] = document["date"].strftime("%Y/%m/%d %I:%M %p UTC")
     document["duration"] = "indefinite" \
         if not document["duration"] \
@@ -49,9 +48,7 @@ async def _moderation_history(self, args, message):
     """!modhistory <user>
     displays punishment history for a user."""
     if not args:
-        await self.send_message(
-            message.channel,
-            utils.cmd_help_format(_moderation_history.__doc__))
+        await utils.send_help(self, message, "modhistory")
         return
     server = message.server if message.server else self.default_server
     user = utils.get_user(args, server.members)
@@ -74,7 +71,7 @@ async def _mod_cmd(self, args, message, cmd, action):
                                 "You are not authorized to use this command.")
         return
     if not args:
-        await self.send_message(message.channel, utils.get_cmd(self, cmd).help)
+        await utils.send_help(self, message, cmd)
         return
     keys = ["duration", "reason"]
     kwargs = utils.get_kwargs(args, keys)
@@ -136,7 +133,7 @@ async def _mod_cmd(self, args, message, cmd, action):
     await self.send_message(
         self.log_channel,
         _punishment_format(self, message.server, document))
-    await self.add_punishment_timer(user, action)
+    await utils.add_punishment_timer(self, user, action)
 
 
 @Discordant.register_command("warn")
@@ -161,7 +158,7 @@ async def _mod_remove_cmd(self, args, message, cmd, action):
                                 "You are not authorized to use this command.")
         return
     if not args:
-        await self.send_message(message.channel, utils.get_cmd(self, cmd).help)
+        await utils.send_help(self, message, cmd)
         return
     user_search = args.split()[0]
     reason = args[len(user_search) + 1:] if " " in args else "No reason given."
@@ -216,8 +213,7 @@ async def _ban(self, args, message):
                                 "You are not authorized to use this command.")
         return
     if not args:
-        await self.send_message(message.channel,
-                                utils.cmd_help_format(_ban.__doc__))
+        await utils.send_help(self, message, "ban")
         return
     user_search = args.split()[0]
     reason = args[len(user_search) + 1:] if " " in args else "No reason given."
