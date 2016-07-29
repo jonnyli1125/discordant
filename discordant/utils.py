@@ -47,20 +47,23 @@ def get_from_kwargs(key, kwargs, default):
 
 
 def get_user(search, seq):
-    def f(x):
-        nonlocal search
-        if search == x.mention:
-            return True
-        if search == str(x):
-            return True
-        if search == x.name or search == x.nick:
-            return True
+    if re.match(r"<@\d+>", search):
+        return discord.utils.get(seq, mention=search)
+    elif re.match(r".+#\d{4}$", search):
+        return discord.utils.get(seq, __str__=search)
+    else:
         temp = search.lower()
-        if temp in x.name.lower() or (x.nick and temp in x.nick.lower()):
-            return True
-        return False
-
-    return discord.utils.find(f, seq)
+        searches = [lambda x: search == x.name,
+                    lambda x: x.nick and search == x.nick,
+                    lambda x: temp == x.name.lower(),
+                    lambda x: x.nick and temp == x.nick.lower(),
+                    lambda x: temp in x.name.lower(),
+                    lambda x: x.nick and temp in x.nick.lower()]
+        for fn in searches:
+            result = discord.utils.find(fn, seq)
+            if result:
+                return result
+        return None
 
 
 async def is_punished(self, member, *actions):
