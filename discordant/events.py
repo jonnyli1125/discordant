@@ -30,7 +30,7 @@ async def load_punishment_timers(self):
     timers = []
     for document in reversed(cursor):
         action = document["action"]
-        if action == "ban" or action.startswith("removed"):
+        if action == "ban" or action.startswith("remove"):
             continue
         member = self.default_server.get_member(document["user_id"])
         if not member:

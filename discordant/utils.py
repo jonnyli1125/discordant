@@ -123,8 +123,8 @@ def action_to_role(self, action):
         "mute": "Muted"
     }
     if action not in dct:
-        raise ValueError("Invalid action, must be one of: " +
-                         ", ".join(dct.keys()))
+        raise ValueError("Invalid action {}, must be one of: {}".format(
+            action, ", ".join(dct.keys())))
     return discord.utils.get(self.default_server.roles, name=dct[action])
 
 
