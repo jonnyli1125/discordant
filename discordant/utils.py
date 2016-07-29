@@ -50,7 +50,7 @@ def get_user(search, seq):
     if re.match(r"<@\d+>", search):
         return discord.utils.get(seq, mention=search)
     elif re.match(r".+#\d{4}$", search):
-        return discord.utils.get(seq, __str__=search)
+        return discord.utils.find(lambda x: search == str(x), seq)
     else:
         temp = search.lower()
         searches = [lambda x: search == x.name,

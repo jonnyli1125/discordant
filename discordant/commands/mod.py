@@ -166,9 +166,9 @@ async def _mod_remove_cmd(self, args, message, cmd, action):
     if user is None:
         await self.send_message(message.channel, "User could not be found.")
         return
-    role = utils.action_to_role(self, action)
     collection = self.mongodb.punishments
     orig_action = action.replace("remove ", "")
+    role = utils.action_to_role(self, orig_action)
     if not await utils.is_punished(self, user, orig_action):
         await self.send_message(
             message.channel, user.name + " has no active " + action + ".")
