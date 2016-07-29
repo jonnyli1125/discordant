@@ -451,6 +451,8 @@ async def _tag(self, args, message):
     content = split[1] if len(split) > 1 else None
     query = {"tag": tag}
     cursor = await collection.find(query).to_list(None)
+    if not message.server:
+        message.author = self.default_server.get_member(message.author.id)
 
     def has_permission(user):
         return cursor[0]["owner"] == user.id or \
