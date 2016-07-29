@@ -22,7 +22,8 @@ async def _help(self, args, message):
         try:
             await utils.send_help(self, message, args)
         except:
-            await self.send_message("Command could not be found.")
+            await self.send_message(
+                message.channel, "Command could not be found.")
     else:
         sections = {}
         for cmd in self._commands.values():
@@ -48,6 +49,9 @@ async def _help(self, args, message):
             "separated by space, and the key and value are separated by the " +
             "\"=\" character).\n" +
             "  \\*\\* - any number of kwargs")
+        if message.server:
+            msg = await self.send_message(message.channel, "Check your PMs.")
+            await _delete_after(self, 5, [message, msg])
 
 
 @Discordant.register_command("timezone")
