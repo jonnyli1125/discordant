@@ -159,4 +159,4 @@ def is_controller(self, user):
 
 def python_format(code):
     zwsp = "​"  # zero width space
-    return "```py\n{}\n```".format(code.replace("```", ("`" + zwsp) * 3))
+    return "```py\n{}\n```".format(str(code).replace("```", ("`" + zwsp) * 3))

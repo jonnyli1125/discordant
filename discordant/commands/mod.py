@@ -260,3 +260,21 @@ async def _ban(self, args, message):
         self.log_channel,
         _punishment_format(self, message.server, document))
     await self.ban(user)
+
+
+@Discordant.register_command("bans")
+async def _bans(self, args, message):
+    """!bans
+    lists the bans in this server."""
+    server = message.server if message.server else self.default_server
+    member = server.get_member(message.author.id)
+    if not utils.has_permission(member, "ban_members"):
+        await self.send_message(member,
+                                "You are not authorized to use this command.")
+        return
+    bans = await self.get_bans(server)
+    await self.send_message(
+        message.channel,
+        utils.python_format(
+            "\n".join(["{0}. {1} ({1.id})".format(index + 1, user)
+                       for index, user in enumerate(bans)])))
