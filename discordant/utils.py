@@ -155,3 +155,8 @@ async def send_help(self, message, cmd_name):
 
 def is_controller(self, user):
     return user.id in self.controllers
+
+
+def python_format(code):
+    zwsp = "​"  # zero width space
+    return "```py\n{}\n```".format(code.replace("```", ("`" + zwsp) * 3))

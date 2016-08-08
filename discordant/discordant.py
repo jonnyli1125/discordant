@@ -2,6 +2,7 @@ import asyncio
 import json
 import re
 import sys
+import traceback
 from collections import namedtuple
 from inspect import iscoroutinefunction
 from os import path
@@ -97,14 +98,14 @@ class Discordant(discord.Client):
                 self._commands[cmd_name].aliases.append(alias)
 
     async def on_error(self, event_method, *args, **kwargs):
-        import traceback
         await super().on_error(event_method, *args, **kwargs)
         # have to put this here cuz traceback.format_exc wont work otherwise
         try:
+            zwsp = "​"  # zero width space
             for uid in self.controllers:
                 await self.send_message(
                     self.default_server.get_member(uid),
-                    "```{}```".format(traceback.format_exc()))
+                    utils.python_format(traceback.format_exc()))
         except:
             print("Error in on_error:\n" + traceback.format_exc(),
                   file=sys.stderr)

@@ -1,3 +1,4 @@
+import inspect
 import os
 import os.path
 import time
@@ -130,8 +131,18 @@ async def _userinfo(self, args, message):
 async def _eval(self, args, message):
     """!eval <expression>
     evaluates a python expression in the discordant command context."""
+    # taken from Rapptz/RoboDanny's eval command, edited for Discordant
     if not utils.is_controller(self, message.author):
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
-    await self.send_message(message.channel, "```{}```".format(eval(args)))
+    try:
+        result = eval(args)
+        if inspect.isawaitable(result):
+            result = await result
+    except Exception as e:
+        await self.send_message(
+            message.channel,
+            utils.python_format(type(e).__name__ + ": " + str(e)))
+        return
+    await self.send_message(message.channel, utils.python_format(result))
