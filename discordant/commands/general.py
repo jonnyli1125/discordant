@@ -25,15 +25,14 @@ async def _help(self, args, message):
         else:
             sections[cmd.section] = [cmd]
     if args:
-        try:
+        if utils.get_cmd(self, args):
             await utils.send_help(self, message, args)
-        except:
-            if args in sections:
-                await utils.send_long_message(self, message.channel, _help_menu(
-                    [sections[args]]))
-            else:
-                await self.send_message(
-                    message.channel, "Command could not be found.")
+        elif args in sections:
+            await utils.send_long_message(self, message.channel, _help_menu(
+                {args: sections[args]}))
+        else:
+            await self.send_message(
+                message.channel, "Command could not be found.")
     else:
         await utils.send_long_message(self, message.author, _help_menu(
             sections))

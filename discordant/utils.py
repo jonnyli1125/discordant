@@ -134,7 +134,10 @@ def has_permission(user, permission):
 
 
 def get_cmd(self, cmd_name):
-    return self._commands[self._aliases[cmd_name]]
+    try:
+        return self._commands[self._aliases[cmd_name]]
+    except KeyError:
+        return None
 
 
 def cmd_help_format(cmd):
