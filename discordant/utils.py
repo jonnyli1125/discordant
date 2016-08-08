@@ -129,7 +129,7 @@ def action_to_role(self, action):
 
 
 def has_permission(user, permission):
-    return len(
+    return user.owner or len(
         [x for x in user.roles if getattr(x.permissions, permission)]) > 0
 
 
@@ -148,3 +148,7 @@ def cmd_help_format(cmd):
 async def send_help(self, message, cmd_name):
     await self.send_message(message.channel, cmd_help_format(get_cmd(
         self, cmd_name)))
+
+
+def is_controller(self, user):
+    return user.id in self.controllers

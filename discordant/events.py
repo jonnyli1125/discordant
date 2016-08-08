@@ -8,6 +8,18 @@ import discordant.utils as utils
 from discordant import Discordant
 
 
+@Discordant.register_event("ready")
+async def load_voice_roles(self):
+    server = self.default_server
+    voice_role = discord.utils.get(server.roles, name="Voice")
+    vc_role = discord.utils.get(server.roles, name="VC Shown")
+    vc = [x for x in server.channels if x.type == discord.ChannelType.voice]
+    for channel in vc:
+        for member in channel.voice_members:
+            _update_voice_roles(self, member, voice_role, vc_role)
+    # TODO: remove roles from people who aren't in voice
+
+
 async def _update_voice_roles(self, member, *roles):
     in_voice = bool(member.voice_channel) and \
                member.voice_channel != member.server.afk_channel
@@ -95,20 +107,24 @@ async def discordme_bump(self):
 
 @Discordant.register_event("member_join")
 async def on_member_join(self, member):
-    if await utils.is_punished(self, member):
+    punishments = []
+    for action in ["ban", "warning", "mute"]:
+        if await utils.is_punished(self, member, action):
+            punishments.append(action)
+    if punishments:
         await self.send_message(
             self.staff_channel,
             "Punished user {0} ({0.id}) joined the server.".format(member))
-        if await utils.is_punished(self, member, "ban"):
+        if "ban" in punishments:
             await self.ban(member)
+            return
         else:
             to_add = []
             timers = []
-            for action in ["warning", "mute"]:
-                if await utils.is_punished(self, member, action):
-                    to_add.append(utils.action_to_role(self, action))
-                    timers.append(utils.add_punishment_timer(
-                        self, member, action))
+            for action in punishments:
+                to_add.append(utils.action_to_role(self, action))
+                timers.append(utils.add_punishment_timer(
+                    self, member, action))
             if to_add:
                 await asyncio.gather(self.add_roles(member, *to_add),
                                      *timers)

@@ -14,7 +14,7 @@ from discordant import Discordant
 async def _client_settings(self, args, message):
     """!client [\*\*key=value]
     updates the bot's discord client settings."""
-    if message.author.id not in self.controllers:
+    if not utils.is_controller(self, message.author):
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
@@ -49,7 +49,7 @@ async def _client_settings(self, args, message):
 async def _say(self, args, message):
     """!say <channel> <message>
     sends a message to a channel through the bot."""
-    if message.author.id not in self.controllers:
+    if not utils.is_controller(self, message.author):
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
@@ -68,7 +68,7 @@ async def _say(self, args, message):
 async def _edit(self, args, message):
     """!edit <channel> <message id> <message>
     edits a message with that id in the given channel to a new message."""
-    if message.author.id not in self.controllers:
+    if not utils.is_controller(self, message.author):
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
@@ -87,10 +87,10 @@ async def _edit(self, args, message):
     await self.edit_message(msg, split[2])
 
 
-@Discordant.register_command("info")
+@Discordant.register_command("uptime")
 async def _stats(self, args, message):
-    """!info
-    displays bot process info."""
+    """!uptime
+    displays bot process uptime."""
     process = psutil.Process(os.getpid())
     uptime = time.time() - process.create_time()
     m, s = divmod(uptime, 60)
@@ -124,3 +124,14 @@ async def _userinfo(self, args, message):
          "**account created**: {0.created_at}\n" +
          "**joined server**: {0.joined_at}\n" +
          "**avatar**: {0.avatar_url}").format(user))
+
+
+@Discordant.register_command("eval")
+async def _eval(self, args, message):
+    """!eval <expression>
+    evaluates a python expression in the discordant command context."""
+    if not utils.is_controller(self, message.author):
+        await self.send_message(message.channel,
+                                "You are not authorized to use this command.")
+        return
+    await self.send_message(message.channel, "```{}```".format(eval(args)))

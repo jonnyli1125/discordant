@@ -16,29 +16,27 @@ from discordant import Discordant
 
 @Discordant.register_command("help")
 async def _help(self, args, message):
-    """!help [command]
+    """!help [command/section]
     displays command help and information."""
+    sections = {}
+    for cmd in self._commands.values():
+        if cmd.section in sections:
+            sections[cmd.section].append(cmd)
+        else:
+            sections[cmd.section] = [cmd]
     if args:
         try:
             await utils.send_help(self, message, args)
         except:
-            await self.send_message(
-                message.channel, "Command could not be found.")
-    else:
-        sections = {}
-        for cmd in self._commands.values():
-            if cmd.section in sections:
-                sections[cmd.section].append(cmd)
+            if args in sections:
+                await utils.send_long_message(self, message.channel, _help_menu(
+                    [sections[args]]))
             else:
-                sections[cmd.section] = [cmd]
-        output = "**commands**:"
-        for section, cmd_list in sections.items():
-            tab_4 = " " * 4
-            output += "\n  __{}__:\n".format(section) + \
-                      "\n".join([tab_4 + "*{}* - ".format(cmd.aliases[0]) +
-                                 cmd.help.replace("\n", tab_4 + "\n").split(
-                                     " - ", 1)[1] for cmd in cmd_list])
-        await utils.send_long_message(self, message.author, output)
+                await self.send_message(
+                    message.channel, "Command could not be found.")
+    else:
+        await utils.send_long_message(self, message.author, _help_menu(
+            sections))
         await self.send_message(
             message.author,
             "**command help syntax**:\n" +
@@ -52,6 +50,17 @@ async def _help(self, args, message):
         if message.server:
             msg = await self.send_message(message.channel, "Check your PMs.")
             await _delete_after(self, 5, [message, msg])
+
+
+def _help_menu(sections):
+    output = "**commands**:"
+    for section, cmd_list in sections.items():
+        tab_4 = " " * 4
+        output += "\n  __{}__:\n".format(section) + \
+                  "\n".join([tab_4 + "*{}* - ".format(cmd.aliases[0]) +
+                             cmd.help.replace("\n", tab_4 + "\n").split(
+                                 " - ", 1)[1] for cmd in cmd_list])
+    return output
 
 
 @Discordant.register_command("timezone")
