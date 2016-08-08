@@ -1,45 +1,7 @@
-Discordant
-==========
+jp-bot
+======
 
-A bot for Discord written in Python 3.
-
-Instructions
-------------
-
-If Python 3 is `python3`, replace instances of `python` with `python3`.
-
-#### virtualenv
-
-It is suggested to run and develop the bot in a virtualenv. To create a new
-virtualenv, first install virtualenv using
-
-    pip install virtualenv
-
-and create a new virtualenv
-
-    virtualenv venv
-
-replacing `venv` with the desired name. To begin using the virtualenv, run
-
-    source ./venv/bin/activate
-
-if on *nix, or
-
-    ".\venv\Scripts\Activate"
-
-if on Windows.
-
-#### Install dependencies
-
-To install dependencies, run
-
-    pip install -r requirements.txt
-
-#### Run the bot
-
-To run the bot, run
-
-    python run.py
+A bot for Discord written in Python 3. Created for the Japanese learning community server, [-日本語を勉強しましょう-](https://discord.me/learnjapanese).
 
 License
 -------
