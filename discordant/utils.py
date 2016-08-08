@@ -129,7 +129,7 @@ def action_to_role(self, action):
 
 
 def has_permission(user, permission):
-    return user.owner or len(
+    return user == user.server.owner or len(
         [x for x in user.roles if getattr(x.permissions, permission)]) > 0
 
 
