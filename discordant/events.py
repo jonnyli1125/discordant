@@ -12,12 +12,10 @@ from discordant import Discordant
 async def load_voice_roles(self):
     server = self.default_server
     voice_role = discord.utils.get(server.roles, name="Voice")
-    vc_role = discord.utils.get(server.roles, name="VC Shown")
-    vc = [x for x in server.channels if x.type == discord.ChannelType.voice]
-    for channel in vc:
-        for member in channel.voice_members:
-            _update_voice_roles(self, member, voice_role, vc_role)
-    # TODO: remove roles from people who aren't in voice
+    voiced = [x for x in server.members
+              if x.voice_channel or voice_role in x.roles]
+    for user in voiced:
+        await update_voice_roles(self, user)
 
 
 async def _update_voice_roles(self, member, *roles):
@@ -25,6 +23,16 @@ async def _update_voice_roles(self, member, *roles):
                member.voice_channel != member.server.afk_channel
     f = getattr(self, ("add" if in_voice else "remove") + "_roles")
     await f(member, *roles)
+
+
+async def update_voice_roles(self, member):
+    voice_role = discord.utils.get(member.server.roles, name="Voice")
+    vc_role = discord.utils.get(member.server.roles, name="VC Shown")
+    roles = [voice_role]
+    doc = await self.mongodb.always_show_vc.find_one({"user_id": member.id})
+    if not doc or not doc["value"]:
+        roles.append(vc_role)
+    await _update_voice_roles(self, member, *roles)
 
 
 _load_punishment_timers = False
@@ -141,11 +149,7 @@ async def on_member_leave(self, member):
 @Discordant.register_event("voice_state_update")
 async def on_voice_state_update(self, before, after):
     if before.voice_channel != after.voice_channel:
-        roles = [discord.utils.get(after.server.roles, name="Voice")]
-        doc = await self.mongodb.always_show_vc.find_one({"user_id": after.id})
-        if not doc or not doc["value"]:
-            roles.append(discord.utils.get(after.server.roles, name="VC Shown"))
-        await _update_voice_roles(self, after, *roles)
+        await update_voice_roles(self, after)
 
 
 @Discordant.register_event("ready")
