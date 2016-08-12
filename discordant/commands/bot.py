@@ -115,16 +115,16 @@ async def _userinfo(self, args, message):
         return
     server = message.server if message.server else self.default_server
     user = utils.get_user(args, server.members)
-    if user is None:
+    if not user:
         await self.send_message(message.channel, "User could not be found.")
         return
     await self.send_message(
         message.channel,
         ("**name**: {0}\n" +
          "**id**: {0.id}\n" +
-         "**account created**: {0.created_at}\n" +
-         "**joined server**: {0.joined_at}\n" +
-         "**avatar**: {0.avatar_url}").format(user))
+         "**account created**: {0.created_at} UTC\n" +
+         "**joined server**: {0.joined_at} UTC\n" +
+         "**avatar**: {1}").format(user, utils.get_avatar_url(user)))
 
 
 @Discordant.register_command("eval")
@@ -136,6 +136,9 @@ async def _eval(self, args, message):
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
+    if not args:
+        await utils.send_help(self, message, "eval")
+        return
     try:
         result = eval(args)
         if inspect.isawaitable(result):
@@ -146,3 +149,25 @@ async def _eval(self, args, message):
             utils.python_format(type(e).__name__ + ": " + str(e)))
         return
     await self.send_message(message.channel, utils.python_format(result))
+
+
+@Discordant.register_command("usercmd")
+async def _usercmd(self, args, message):
+    """!usercmd <user> <command>
+    executes a command as another user."""
+    if not utils.is_controller(self, message.author):
+        await self.send_message(message.channel,
+                                "You are not authorized to use this command.")
+        return
+    split = args.split(None, 1)
+    if len(split) < 2:
+        await utils.send_help(self, message, "ucmd")
+        return
+    server = message.server if message.server else self.default_server
+    user = utils.get_user(split[0], server.members)
+    if not user:
+        await self.send_message(message.channel, "User could not be found.")
+        return
+    message.author = user
+    message.content = "!" + split[1]
+    await self.run_command(message)

@@ -136,7 +136,7 @@ class Discordant(discord.Client):
             # do we return after the first match? or allow multiple matches
 
     async def run_command(self, message):
-        cmd_name, *args = message.content.split(' ')
+        cmd_name, *args = message.content.split()
         cmd_name = cmd_name[1:]
         args = ' '.join(args).strip()
 

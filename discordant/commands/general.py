@@ -400,14 +400,12 @@ async def _show_voice_channels_toggle(self, args, message):
     query = {"user_id": message.author.id}
     collection = self.mongodb.always_show_vc
     cursor = await collection.find(query).to_list(None)
-    if not cursor:
-        show = True
-        await collection.insert({"user_id": message.author.id, "value": show})
-    else:
-        show = not cursor[0]["value"]
-        await collection.update(query, {"$set": {"value": show}})
+    show = not cursor[0]["value"] if cursor else True
+    await collection.update(
+        query,
+        dict(query, value=show),
+        upsert=True)
     role = discord.utils.get(self.default_server.roles, name="VC Shown")
-
     member = message.author if message.server \
         else self.default_server.get_member(message.author.id)
     if show:

@@ -153,22 +153,26 @@ async def on_voice_state_update(self, before, after):
 
 
 @Discordant.register_event("ready")
-async def stats_fetch_logs(self):
+async def stats_update(self):
     if not self.user.bot:
         print("Stats logs cannot be fetched: please run through a bot account.")
         return
-    collection = self.mongodb.logs
+    server = self.default_server
     logs = []
-    for channel in self.default_server.channels:
-        if channel == self.staff_channel or channel == self.testing_channel:
+    channels = []
+    for channel in server.channels:
+        if channel in [self.staff_channel, self.testing_channel] \
+                or channel.type != discord.ChannelType.text:
             continue
-        search = await collection.find_one({
+        channels.append({"channel_id": channel.id, "name": channel.name})
+        search = await self.mongodb.logs.find_one({
             "$query": {"channel_id": channel.id},
             "$orderby": {"$natural": -1}
         })
         limit, after = (sys.maxsize, await self.get_message(
             channel, search["message_id"])) if search else (100, None)
         async for message in self.logs_from(channel, limit, after=after):
+            author = message.author
             logs.append({
                 "message_id": message.id,
                 "author_id": message.author.id,
@@ -176,19 +180,28 @@ async def stats_fetch_logs(self):
                 "timestamp": message.timestamp,
                 "content": message.clean_content
             })
+    members = [{"user_id": x.id,
+                "name": x.name,
+                "discriminator": x.discriminator,
+                "created_at": utils.datetime_floor_microseconds(x.created_at),
+                "joined_at": utils.datetime_floor_microseconds(x.joined_at),
+                "avatar": utils.get_avatar_url(x)}
+               for x in server.members]
     if logs:
-        await collection.insert(sorted(logs, key=lambda x: x["timestamp"]))
-    print("Updated stats logs: {} messages inserted.".format(len(logs)))
-
-
-async def stats_fetch_type(self, name, collection, keys):
-    collection = self.mongodb[name + "s"]
-    data = []
-    for obj in collection:
-        if obj == self.staff_channel or obj == self.testing_channel:
-            continue
-
-
-@Discordant.register_event("ready")
-async def stats_fetch_members(self):
-    pass
+        await self.mongodb.logs.insert(
+            sorted(logs, key=lambda x: x["timestamp"]))
+    dct = {"channels": "channel_id", "members": "user_id"}
+    for name, id_name in dct.items():
+        count_name = name + "_updated"
+        locals()[count_name] = 0
+        for obj in locals()[name]:
+            query = {id_name: obj[id_name]}
+            collection = self.mongodb[name]
+            document = await collection.find_one(query)
+            if document:
+                del document["_id"]
+            if document != obj:
+                await collection.update(query, obj, upsert=True)
+                locals()[count_name] += 1
+    print("Updated stats: {} messages, {} channels, {} users updated.".format(
+        len(logs), locals()["channels_updated"], locals()["members_updated"]))

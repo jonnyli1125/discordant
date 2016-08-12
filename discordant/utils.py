@@ -159,4 +159,13 @@ def is_controller(self, user):
 
 def python_format(code):
     zwsp = "​"  # zero width space
-    return "```py\n{}\n```".format(str(code).replace("```", ("`" + zwsp) * 3))
+    return "```py\n{}\n```".format(str(code).replace("`", "`" + zwsp))
+
+
+def get_avatar_url(user):
+    return user.avatar_url if user.avatar else user.default_avatar_url
+
+
+def datetime_floor_microseconds(dt, digits=3):
+    n = 10 ** digits
+    return dt.replace(microsecond=dt.microsecond // n * n)
