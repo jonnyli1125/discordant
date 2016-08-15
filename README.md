@@ -6,4 +6,4 @@ A bot for Discord written in Python 3. Created for the Japanese learning communi
 License
 -------
 
-Discordant is licensed under the [MIT License](LICENSE).
+jp-bot (discordant) is licensed under the [MIT License](LICENSE).
