@@ -50,9 +50,9 @@ async def _moderation_history(self, args, message):
     if not args:
         await utils.send_help(self, message, "modhistory")
         return
-    server = message.server if message.server else self.default_server
-    user = utils.get_user(args, server.members)
-    if user is None:
+    server = message.server or self.default_server
+    user = utils.get_user(args, server.members, message)
+    if not user:
         await self.send_message(message.channel, "User could not be found.")
         return
     collection = self.mongodb.punishments
@@ -64,10 +64,10 @@ async def _moderation_history(self, args, message):
 
 
 async def _mod_cmd(self, args, message, cmd, action):
-    server = message.server if message.server else self.default_server
+    server = message.server or self.default_server
     member = server.get_member(message.author.id)
-    if not utils.has_permission(member, "manage_roles"):
-        await self.send_message(member,
+    if not message.channel.permissions_for(member).manage_roles:
+        await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
     if not args:
@@ -81,13 +81,13 @@ async def _mod_cmd(self, args, message, cmd, action):
         args = split[0] + ' reason="' + " ".join(split[1:]) + '"'
         kwargs = utils.get_kwargs(args, keys)
     user_search = utils.strip_kwargs(args, keys)
-    user = utils.get_user(user_search, server.members)
-    if user is None:
+    user = utils.get_user(user_search, server.members, message)
+    if not user:
         await self.send_message(message.channel, "User could not be found.")
         return
-    if utils.has_permission(user, "manage_roles"):
+    if utils.geq_role(self, user, member):
         await self.send_message(message.channel,
-                                "Cannot " + cmd + " another moderator.")
+                                "Cannot {} {}".format(cmd, user.name))
         return
     duration = utils.get_from_kwargs(
         "duration", kwargs, self.config["moderation"][cmd + "_duration"])
@@ -116,7 +116,7 @@ async def _mod_cmd(self, args, message, cmd, action):
                                 (m.content.lower() == "y" or
                                  m.content.lower() == "n"),
                 timeout=60)
-            if reply is None or reply.content.lower() == "n":
+            if not reply or reply.content.lower() == "n":
                 await self.send_message(
                     message.channel, "Cancelled " + action + ".")
                 return
@@ -151,10 +151,10 @@ async def _mute(self, args, message):
 
 
 async def _mod_remove_cmd(self, args, message, cmd, action):
-    server = message.server if message.server else self.default_server
+    server = message.server or self.default_server
     member = server.get_member(message.author.id)
-    if not utils.has_permission(member, "manage_roles"):
-        await self.send_message(member,
+    if not message.channel.permissions_for(member).manage_roles:
+        await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
     if not args:
@@ -162,9 +162,13 @@ async def _mod_remove_cmd(self, args, message, cmd, action):
         return
     user_search = args.split()[0]
     reason = args[len(user_search) + 1:] if " " in args else "No reason given."
-    user = utils.get_user(user_search, server.members)
-    if user is None:
+    user = utils.get_user(user_search, server.members, message)
+    if not user:
         await self.send_message(message.channel, "User could not be found.")
+        return
+    if utils.geq_role(self, user, member):
+        await self.send_message(message.channel,
+                                "Cannot {} {}".format(cmd, user.name))
         return
     collection = self.mongodb.punishments
     orig_action = action.replace("remove ", "")
@@ -206,10 +210,10 @@ async def _unmute(self, args, message):
 async def _ban(self, args, message):
     """!ban <user/user id> [reason]
     bans a user."""
-    server = message.server if message.server else self.default_server
+    server = message.server or self.default_server
     member = server.get_member(message.author.id)
-    if not utils.has_permission(member, "ban_members"):
-        await self.send_message(member,
+    if not message.channel.permissions_for(member).ban_members:
+        await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
     if not args:
@@ -217,8 +221,8 @@ async def _ban(self, args, message):
         return
     user_search = args.split()[0]
     reason = args[len(user_search) + 1:] if " " in args else "No reason given."
-    user = utils.get_user(user_search, server.members)
-    if user is None:
+    user = utils.get_user(user_search, server.members, message)
+    if not user:
         await self.send_message(
             message.channel,
             "User could not be found.\nIf this is a user ID, type y/n.")
@@ -227,7 +231,7 @@ async def _ban(self, args, message):
                             (m.content.lower() == "y" or
                              m.content.lower() == "n"),
             timeout=60)
-        if reply is None or reply.content.lower() == "n":
+        if not reply or reply.content.lower() == "n":
             await self.send_message(message.channel, "Cancelled ban.")
             return
         else:
@@ -237,9 +241,9 @@ async def _ban(self, args, message):
                 discriminator="",
                 server=server)
     else:
-        if utils.has_permission(user, "ban_members"):
+        if utils.geq_role(self, user, member):
             await self.send_message(message.channel,
-                                    "Cannot ban another moderator.")
+                                    "Cannot ban " + user.name)
             return
     collection = self.mongodb.punishments
     doc = await collection.find_one({"user_id": user.id, "action": "ban"})
@@ -266,10 +270,10 @@ async def _ban(self, args, message):
 async def _bans(self, args, message):
     """!bans
     lists the bans in this server."""
-    server = message.server if message.server else self.default_server
+    server = message.server or self.default_server
     member = server.get_member(message.author.id)
-    if not utils.has_permission(member, "ban_members"):
-        await self.send_message(member,
+    if not message.channel.permissions_for(member).ban_members:
+        await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
     bans = await self.get_bans(server)

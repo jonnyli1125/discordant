@@ -406,8 +406,8 @@ async def _show_voice_channels_toggle(self, args, message):
         dict(query, value=show),
         upsert=True)
     role = discord.utils.get(self.default_server.roles, name="VC Shown")
-    member = message.author if message.server \
-        else self.default_server.get_member(message.author.id)
+    server = message.server or self.default_server
+    member = server.get_member(message.author.id)
     if show:
         await self.add_roles(member, role)
         msg = await self.send_message(message.channel, ":white_check_mark:")
@@ -426,10 +426,10 @@ async def _reading_circle(self, args, message):
     add/remove yourself to ping notification lists for beginner or intermediate
     reading circles."""
     try:
-        author = message.author if message.server \
-            else self.default_server.get_member(message.author.id)
+        server = message.server or self.default_server
+        author = server.get_member(message.author.id)
         role_name = "Reading Circle " + args[0].upper() + args[1:].lower()
-        role = discord.utils.get(author.server.roles, name=role_name)
+        role = discord.utils.get(server.roles, name=role_name)
         if role in author.roles:
             await self.remove_roles(author, role)
             msg = await self.send_message(
@@ -466,7 +466,7 @@ async def _tag(self, args, message):
 
     def has_permission(user):
         return cursor[0]["owner"] == user.id or \
-               utils.has_permission(user, "manage_roles")
+               message.channel.permissions_for(user).manage_messages
 
     if content == "delete":
         if not cursor:

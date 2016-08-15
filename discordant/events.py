@@ -183,6 +183,7 @@ async def stats_update(self):
     members = [{"user_id": x.id,
                 "name": x.name,
                 "discriminator": x.discriminator,
+                "nick": x.nick,
                 "created_at": utils.datetime_floor_microseconds(x.created_at),
                 "joined_at": utils.datetime_floor_microseconds(x.joined_at),
                 "avatar": utils.get_avatar_url(x)}

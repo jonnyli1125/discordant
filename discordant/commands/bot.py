@@ -58,9 +58,11 @@ async def _say(self, args, message):
     if len(split) <= 1:
         await utils.send_help(self, message, "say")
         return
-    channel = discord.utils.get(message.channel_mentions, mention=split[0])
+    server = message.server or self.default_server
+    channel = utils.get_channel(split[0], server.channels, message) \
+        or utils.get_user(split[0], server.members, message)
     if not channel:
-        await self.send_message(message.channel, "Channel not found.")
+        await self.send_message(message.channel, "Channel or user not found.")
         return
     await self.send_message(channel, split[1])
 
@@ -77,10 +79,19 @@ async def _edit(self, args, message):
     if len(split) <= 2:
         await utils.send_help(self, message, "edit")
         return
-    channel = discord.utils.get(message.channel_mentions, mention=split[0])
+    server = message.server or self.default_server
+    channel = utils.get_channel(split[0], server.channels, message)
     if not channel:
-        await self.send_message(message.channel, "Channel not found.")
-        return
+        user = utils.get_user(split[0], server.members, message)
+        if not user:
+            await self.send_message(
+                message.channel, "Channel or user not found.")
+            return
+        channel = discord.utils.get(self.private_channels, user=user)
+        if not channel:
+            await self.send_message(
+                message.channel, "No private messages with " + user.name + ".")
+            return
     msg = await self.get_message(channel, split[1])
     if not msg:
         await self.send_message(message.channel, "Message not found.")
@@ -113,8 +124,8 @@ async def _userinfo(self, args, message):
     if not args:
         await utils.send_help(self, message, "userinfo")
         return
-    server = message.server if message.server else self.default_server
-    user = utils.get_user(args, server.members)
+    server = message.server or self.default_server
+    user = utils.get_user(args, server.members, message)
     if not user:
         await self.send_message(message.channel, "User could not be found.")
         return
@@ -163,8 +174,8 @@ async def _usercmd(self, args, message):
     if len(split) < 2:
         await utils.send_help(self, message, "ucmd")
         return
-    server = message.server if message.server else self.default_server
-    user = utils.get_user(split[0], server.members)
+    server = message.server or self.default_server
+    user = utils.get_user(split[0], server.members, message)
     if not user:
         await self.send_message(message.channel, "User could not be found.")
         return
