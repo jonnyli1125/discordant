@@ -223,7 +223,8 @@ async def _alc_search(self, args, message):
         return
     limit, query = search_args
     url = "http://eow.alc.co.jp/search?q=" + \
-          urllib.parse.quote(re.sub(r"\s+", "+", query), encoding="utf-8")
+          urllib.parse.quote(
+              re.sub(r"\s+", "+", query), encoding="utf-8", safe="+")
     try:
         with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
