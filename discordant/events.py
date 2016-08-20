@@ -165,12 +165,18 @@ async def stats_update(self):
                 or channel.type != discord.ChannelType.text:
             continue
         channels.append({"channel_id": channel.id, "name": channel.name})
-        search = await self.mongodb.logs.find_one({
+        search = await self.mongodb.logs.find({
             "$query": {"channel_id": channel.id},
             "$orderby": {"$natural": -1}
-        })
-        limit, after = (sys.maxsize, await self.get_message(
-            channel, search["message_id"])) if search else (100, None)
+        }).to_list(None)
+        last_msg = None
+        for res in search:
+            try:
+                last_msg = await self.get_message(channel, res["message_id"])
+                break
+            except discord.NotFound:
+                pass
+        limit, after = (sys.maxsize, last_msg) if last_msg else (100, None)
         async for message in self.logs_from(channel, limit, after=after):
             author = message.author
             logs.append({
