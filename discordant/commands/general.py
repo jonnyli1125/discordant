@@ -498,17 +498,60 @@ async def _studying(self, args, message):
     add/remove a studying resource tag to yourself."""
     server = message.server or self.default_server
     author = server.get_member(message.author.id)
-    role_names = ["Genki 1", "Genki 2", "Tobira", "Tae Kim", "Anki", "Wanikani"]
-    roles = [discord.utils.get(server.roles, name=x) for x in role_names]
+    collection = self.mongodb.studying_resources
+    obj = await collection.find_one()
+    if obj:
+        role_names = obj["value"]
+    else:
+        await collection.insert({"value": []})
+        role_names = []
     if not args:
-        await utils.send_help(self, message, "studying")
+        await self.send_message(
+            message.channel,
+            utils.cmd_help_format(utils.get_cmd(self, "studying")) +
+            "\nResources: " + ", ".join(role_names))
         return
+    split = args.split(None, 1)
+    if len(split) > 1:
+        subcmd = split[0]
+        resource = split[1]
+        role = discord.utils.get(server.roles, name=resource)
+        if subcmd == "add":
+            if not utils.is_controller(self, author):
+                await self.send_message(
+                    message.channel, "You're not allowed to do that.")
+                return
+            await collection.update({}, {"$push": {"value": resource}})
+            if not role:
+                await self.create_role(
+                    server,
+                    name=resource,
+                    permissions=server.default_role.permissions)
+            await self.send_message(
+                message.channel, "Added studying resource: " + resource)
+            return
+        if subcmd == "del":
+            if not utils.is_controller(self, author):
+                await self.send_message(
+                    message.channel, "You're not allowed to do that.")
+                return
+            await collection.update({}, {"$pull": {"value": resource}})
+            if role:
+                await self.delete_role(server, role)
+            await self.send_message(
+                message.channel, "Deleted studying resource: " + resource)
+            return
 
     def search_str(s):
         return "".join(s.lower().split())
 
-    role = discord.utils.find(
-        lambda x: search_str(x.name) == search_str(args), roles)
+    def find_role(r):
+        n = search_str(r.name)
+        a = search_str(args)
+        return n == a or n.startswith(a) or n in a
+
+    roles = [discord.utils.get(server.roles, name=x) for x in role_names]
+    role = discord.utils.find(find_role, roles)
     if not role:
         await self.send_message(message.channel, "Resource could not be found.")
         return
