@@ -148,7 +148,7 @@ async def _dict_search_args_parse(self, args, message, cmd, keys=None):
 @Discordant.register_command("jisho")
 async def _jisho_search(self, args, message):
     """!jisho [limit] <query>
-    searches japanese-english dictionary ``http://jisho.org``."""
+    searches japanese-english dictionary `http://jisho.org`."""
     search_args = await _dict_search_args_parse(self, args, message, "jisho")
     if not search_args:
         return
@@ -164,9 +164,7 @@ async def _jisho_search(self, args, message):
         return
     results = data["data"][:limit]
     if not results:
-        sent = await self.send_message(message.channel, "No results found.")
-        if message.server:
-            await _delete_after(self, 5, [message, sent])
+        await self.send_message(message.channel, "No results found.")
         return
     output = ""
 
@@ -217,7 +215,7 @@ async def _jisho_search(self, args, message):
 @Discordant.register_command("alc")
 async def _alc_search(self, args, message):
     """!alc [limit] <query>
-    searches english-japanese dictionary ``http://alc.co.jp``."""
+    searches english-japanese dictionary `http://alc.co.jp`."""
     search_args = await _dict_search_args_parse(self, args, message, "alc")
     if not search_args:
         return
@@ -236,9 +234,7 @@ async def _alc_search(self, args, message):
     tree = html.fromstring(data)
     results = tree.xpath('//div[@id="resultsList"]/ul/li')[:limit]
     if not results:
-        sent = await self.send_message(message.channel, "No results found.")
-        if message.server:
-            await _delete_after(self, 5, [message, sent])
+        await self.send_message(message.channel, "No results found.")
         return
     for result in results:
         words = [x for x in result.xpath('./span') if
@@ -312,9 +308,7 @@ async def _example_sentence_search(self, args, message, cmd, url):
     query = '//li[contains(@class, "sentence") and span[@class="the-sentence"]]'
     results = tree.xpath(query)[:limit]
     if not results:
-        sent = await self.send_message(message.channel, "No results found.")
-        if message.server:
-            await _delete_after(self, 5, [message, sent])
+        await self.send_message(message.channel, "No results found.")
         return
     japanese = cmd == "yourei"
 
@@ -345,7 +339,7 @@ async def _example_sentence_search(self, args, message, cmd, url):
 @Discordant.register_command("yourei")
 async def _yourei_search(self, args, message):
     """!yourei [limit] <query> [context=bool]
-    Searches Japanese example sentences from ``http://yourei.jp``."""
+    Searches Japanese example sentences from `http://yourei.jp`."""
     await _example_sentence_search(
         self, args, message, "yourei", "http://yourei.jp/")
 
@@ -353,7 +347,7 @@ async def _yourei_search(self, args, message):
 @Discordant.register_command("nyanglish")
 async def _nyanglish_search(self, args, message):
     """!nyanglish [limit] <query> [context=bool]
-    searches english example sentences from ``http://nyanglish.com``."""
+    searches english example sentences from `http://nyanglish.com`."""
     await _example_sentence_search(
         self, args, message, "nyanglish", "http://nyanglish.com/")
 
@@ -362,6 +356,7 @@ async def _nyanglish_search(self, args, message):
 async def _yourei_link(self, match, message):
     await _dict_search_link(
         self, match, message, match.group(1).split(".")[0], 2)
+
 
 async def _delete_after(self, time, args):
     await asyncio.sleep(time)
@@ -495,3 +490,34 @@ async def _tag(self, args, message):
         await self.send_message(
             message.channel,
             cursor[0]["content"] if cursor else "Tag could not be found")
+
+
+@Discordant.register_command("studying")
+async def _studying(self, args, message):
+    """!studying <resource>
+    add/remove a studying resource tag to yourself."""
+    server = message.server or self.default_server
+    author = server.get_member(message.author.id)
+    role_names = ["Anki", "Wanikani", "Genki 1", "Genki 2", "Tae Kim"]
+    roles = [discord.utils.get(server.roles, name=x) for x in role_names]
+    if not args:
+        await utils.send_help(self, message, "studying")
+        return
+
+    def search_str(s):
+        return "".join(s.lower().split())
+
+    role = discord.utils.find(
+        lambda x: search_str(x.name) == search_str(args), roles)
+    if not role:
+        await self.send_message(message.channel, "Resource could not be found.")
+        return
+    if role in message.author.roles:
+        await self.remove_roles(author, role)
+        msg = await self.send_message(
+            message.channel, ":negative_squared_cross_mark:")
+    else:
+        await self.add_roles(author, role)
+        msg = await self.send_message(message.channel, ":white_check_mark:")
+    if message.server:
+        await _delete_after(self, 5, [message, msg])
