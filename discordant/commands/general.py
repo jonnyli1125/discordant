@@ -526,7 +526,8 @@ async def _studying(self, args, message):
                 await self.create_role(
                     server,
                     name=resource,
-                    permissions=server.default_role.permissions)
+                    permissions=server.default_role.permissions,
+                    mentionable=True)
             await self.send_message(
                 message.channel, "Added studying resource: " + resource)
             return
