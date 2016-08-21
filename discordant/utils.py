@@ -184,5 +184,6 @@ def datetime_floor_microseconds(dt, digits=3):
 
 
 def geq_role(self, user, author):
+    self_user = self.default_server.get_member(self.user.id)
     return user.top_role.position >= min(
-        self.user.top_role.position, author.top_role.position)
+        self_user.top_role.position, author.top_role.position)
