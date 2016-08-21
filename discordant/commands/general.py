@@ -498,7 +498,7 @@ async def _studying(self, args, message):
     add/remove a studying resource tag to yourself."""
     server = message.server or self.default_server
     author = server.get_member(message.author.id)
-    role_names = ["Anki", "Wanikani", "Genki 1", "Genki 2", "Tae Kim"]
+    role_names = ["Genki 1", "Genki 2", "Tobira", "Tae Kim", "Anki", "Wanikani"]
     roles = [discord.utils.get(server.roles, name=x) for x in role_names]
     if not args:
         await utils.send_help(self, message, "studying")
@@ -512,7 +512,7 @@ async def _studying(self, args, message):
     if not role:
         await self.send_message(message.channel, "Resource could not be found.")
         return
-    if role in message.author.roles:
+    if role in author.roles:
         await self.remove_roles(author, role)
         msg = await self.send_message(
             message.channel, ":negative_squared_cross_mark:")
