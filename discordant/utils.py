@@ -69,13 +69,16 @@ def get_channel(search, seq, message=None):
 def _general_search(search, seq):
     temp = search.lower()
     searches = [lambda x: search == x.name,
-                lambda x: x.nick and search == x.nick,
+                lambda x: hasattr(x, "nick") and x.nick and search == x.nick,
                 lambda x: temp == x.name.lower(),
-                lambda x: x.nick and temp == x.nick.lower(),
+                lambda x: hasattr(x, "nick") and x.nick and
+                          temp == x.nick.lower(),
                 lambda x: x.name.startswith(temp),
-                lambda x: x.nick and x.nick.startswith(temp),
+                lambda x: hasattr(x, "nick") and x.nick and
+                          x.nick.startswith(temp),
                 lambda x: temp in x.name.lower(),
-                lambda x: x.nick and temp in x.nick.lower()]
+                lambda x: hasattr(x, "nick") and x.nick and
+                          temp in x.nick.lower()]
     for fn in searches:
         result = discord.utils.find(fn, seq)
         if result:
