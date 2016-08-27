@@ -136,9 +136,9 @@ class Discordant(discord.Client):
             # do we return after the first match? or allow multiple matches
 
     async def run_command(self, message):
-        cmd_name, *args = message.content.split()
-        cmd_name = cmd_name[1:]
-        args = ' '.join(args).strip()
+        split = message.content.split(None, 1)
+        cmd_name = split[0][1:]
+        args = split[1] if len(split) > 1 else ""
 
         if cmd_name in self._aliases:
             cmd = self._commands[self._aliases[cmd_name]]
