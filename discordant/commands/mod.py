@@ -1,4 +1,6 @@
+import re
 import shlex
+import sys
 from datetime import datetime
 
 import discord.game
@@ -160,8 +162,9 @@ async def _mod_remove_cmd(self, args, message, cmd, action):
     if not args:
         await utils.send_help(self, message, cmd)
         return
-    user_search = args.split()[0]
-    reason = args[len(user_search) + 1:] if " " in args else "No reason given."
+    split = args.split(None, 1)
+    user_search = split[0]
+    reason = split[1] if len(split) > 1 else "No reason given."
     user = utils.get_user(user_search, server.members, message)
     if not user:
         await self.send_message(message.channel, "User could not be found.")
@@ -219,8 +222,9 @@ async def _ban(self, args, message):
     if not args:
         await utils.send_help(self, message, "ban")
         return
-    user_search = args.split()[0]
-    reason = args[len(user_search) + 1:] if " " in args else "No reason given."
+    split = args.split(None, 1)
+    user_search = split[0]
+    reason = split[1] if len(split) > 1 else "No reason given."
     user = utils.get_user(user_search, server.members, message)
     if not user:
         await self.send_message(
@@ -282,3 +286,42 @@ async def _bans(self, args, message):
         utils.python_format(
             "\n".join(["{0}. {1} ({1.id})".format(index + 1, user)
                        for index, user in enumerate(bans)])))
+
+
+@Discordant.register_command("reason")
+async def _reason(self, args, message):
+    """!reason <user> <reason>
+    edits the reason of the given user's most recent punishment."""
+    server = message.server or self.default_server
+    member = server.get_member(message.author.id)
+    if not message.channel.permissions_for(member).ban_members:
+        await self.send_message(message.channel,
+                                "You are not authorized to use this command.")
+        return
+    split = args.split(None, 1)
+    if len(split) < 2:
+        await utils.send_help(self, message, "reason")
+        return
+    user_search = split[0]
+    reason = split[1]
+    user = utils.get_user(user_search, server.members, message) or \
+        utils.get_user(user_search, await self.get_bans(server), message)
+    if not user:
+        await self.send_message(message.channel, "User could not be found.")
+        return
+    collection = self.mongodb.punishments
+    query = {"user_id": user.id}
+    cursor = await collection.find(query).sort(
+        "$natural", -1).limit(1).to_list(None)
+    if not cursor:
+        await self.send_message(
+            message.channel, user.name + " has no punishment history.")
+        return
+    doc = cursor[0]
+    doc["reason"] = reason
+    await collection.save(doc)
+    async for msg in self.logs_from(self.log_channel, limit=sys.maxsize):
+        if "\n*user*: {}\n".format(user) in msg.content:
+            await self.edit_message(
+                msg, re.sub(r"(\*reason\*: ).*", "\g<1>" + reason, msg.content))
+            return
