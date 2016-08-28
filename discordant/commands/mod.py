@@ -162,9 +162,9 @@ async def _mod_remove_cmd(self, args, message, cmd, action):
     if not args:
         await utils.send_help(self, message, cmd)
         return
-    split = args.split(None, 1)
+    split = shlex.split(args)
     user_search = split[0]
-    reason = split[1] if len(split) > 1 else "No reason given."
+    reason = " ".join(split[1:]) if len(split) > 1 else "No reason given."
     user = utils.get_user(user_search, server.members, message)
     if not user:
         await self.send_message(message.channel, "User could not be found.")
@@ -222,9 +222,9 @@ async def _ban(self, args, message):
     if not args:
         await utils.send_help(self, message, "ban")
         return
-    split = args.split(None, 1)
+    split = shlex.split(args)
     user_search = split[0]
-    reason = split[1] if len(split) > 1 else "No reason given."
+    reason = " ".join(split[1:]) if len(split) > 1 else "No reason given."
     user = utils.get_user(user_search, server.members, message)
     if not user:
         await self.send_message(
@@ -298,14 +298,14 @@ async def _reason(self, args, message):
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
-    split = args.split(None, 1)
+    split = shlex.split(args)
     if len(split) < 2:
         await utils.send_help(self, message, "reason")
         return
     user_search = split[0]
-    reason = split[1]
+    reason = " ".join(split[1:])
     user = utils.get_user(user_search, server.members, message) or \
-        utils.get_user(user_search, await self.get_bans(server), message)
+        utils.get_user(user_search, await self.get_bans(server))
     if not user:
         await self.send_message(message.channel, "User could not be found.")
         return
