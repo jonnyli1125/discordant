@@ -68,7 +68,7 @@ async def _moderation_history(self, args, message):
 async def _mod_cmd(self, args, message, cmd, action):
     server = message.server or self.default_server
     member = server.get_member(message.author.id)
-    if not message.channel.permissions_for(member).manage_roles:
+    if not message.channel.permissions_for(member).kick_members:
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
@@ -87,7 +87,7 @@ async def _mod_cmd(self, args, message, cmd, action):
     if not user:
         await self.send_message(message.channel, "User could not be found.")
         return
-    if utils.geq_role(self, user, member):
+    if not utils.gt_role(self, member, user, True):
         await self.send_message(message.channel,
                                 "Cannot {} {}".format(cmd, user.name))
         return
@@ -155,7 +155,7 @@ async def _mute(self, args, message):
 async def _mod_remove_cmd(self, args, message, cmd, action):
     server = message.server or self.default_server
     member = server.get_member(message.author.id)
-    if not message.channel.permissions_for(member).manage_roles:
+    if not message.channel.permissions_for(member).kick_members:
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
@@ -169,7 +169,7 @@ async def _mod_remove_cmd(self, args, message, cmd, action):
     if not user:
         await self.send_message(message.channel, "User could not be found.")
         return
-    if utils.geq_role(self, user, member):
+    if not utils.gt_role(self, member, user, True):
         await self.send_message(message.channel,
                                 "Cannot {} {}".format(cmd, user.name))
         return
@@ -245,7 +245,7 @@ async def _ban(self, args, message):
                 discriminator="",
                 server=server)
     else:
-        if utils.geq_role(self, user, member):
+        if not utils.gt_role(self, member, user, True):
             await self.send_message(message.channel,
                                     "Cannot ban " + user.name)
             return
@@ -294,7 +294,7 @@ async def _reason(self, args, message):
     edits the reason of the given user's most recent punishment."""
     server = message.server or self.default_server
     member = server.get_member(message.author.id)
-    if not message.channel.permissions_for(member).ban_members:
+    if not message.channel.permissions_for(member).kick_members:
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
@@ -318,6 +318,12 @@ async def _reason(self, args, message):
             message.channel, user.name + " has no punishment history.")
         return
     doc = cursor[0]
+    moderator = server.get_member(doc["moderator_id"])
+    if utils.gt_role(self, moderator, member):
+        await self.send_message(
+            message.channel,
+            "Cannot edit punishment issued by moderator of higher role.")
+        return
     doc["reason"] = reason
     await collection.save(doc)
     async for msg in self.logs_from(self.log_channel, limit=sys.maxsize):

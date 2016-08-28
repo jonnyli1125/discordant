@@ -190,3 +190,14 @@ def geq_role(self, user, author):
     self_user = self.default_server.get_member(self.user.id)
     return user.top_role.position >= min(
         self_user.top_role.position, author.top_role.position)
+
+
+def gt_role(self, author, user, include_self=False):
+    def rank(x):
+        return x.top_role.position
+
+    author_rank = rank(author)
+    if include_self:
+        self_user = self.default_server.get_member(self.user.id)
+        author_rank = min(rank(self_user), author_rank)
+    return author_rank > rank(user)
