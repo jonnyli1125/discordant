@@ -5,3 +5,4 @@ pytz
 lxml
 motor
 psutil
+pillow

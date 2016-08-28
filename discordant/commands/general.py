@@ -1,5 +1,6 @@
 import asyncio
 import io
+import math
 import re
 import urllib.parse
 from datetime import datetime
@@ -7,6 +8,7 @@ from datetime import datetime
 import aiohttp
 import discord.game
 import pytz
+from PIL import Image
 from lxml import html
 from pytz import timezone
 
@@ -381,12 +383,32 @@ async def _stroke_order(self, args, message):
                     await self.send_message(message.channel,
                                             args[0] + ": Kanji not found.")
                     return
-                await self.send_file(message.channel,
-                                     io.BytesIO(await response.read()),
-                                     filename=file)
+                raw_response = await response.read()
     except Exception as e:
         await self.send_message(message.channel, "Request failed: " + str(e))
         return
+    orig_image = Image.open(io.BytesIO(raw_response))
+    image = _crop_and_shift_img(orig_image)
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    buffer.seek(0)
+    await self.send_file(message.channel, buffer, filename=file)
+
+
+def _crop_and_shift_img(img):
+    char_width = 109  # width/height of one character
+    chars_per_line = 4  # max before discord starts resizing it
+    max_width = char_width * chars_per_line
+    slices = int(math.ceil(img.width / max_width))
+    total_height = char_width * slices
+    width = min(max_width, img.width)
+    new_img = Image.new("RGB", (width, total_height), color="#fff")
+    for i in range(slices):
+        left = i * max_width
+        right = min(left + max_width, img.width)
+        _slice = img.crop((left, 0, right, char_width))
+        new_img.paste(_slice, (0, char_width * i))
+    return new_img
 
 
 @Discordant.register_command("showvc")
