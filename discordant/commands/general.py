@@ -402,7 +402,7 @@ def _crop_and_shift_img(img):
     slices = int(math.ceil(img.width / max_width))
     total_height = char_width * slices
     width = min(max_width, img.width)
-    new_img = Image.new("RGB", (width, total_height), color="#fff")
+    new_img = Image.new("RGBA", (width, total_height), color=(0, 0, 0, 0))
     for i in range(slices):
         left = i * max_width
         right = min(left + max_width, img.width)
