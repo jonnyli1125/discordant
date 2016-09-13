@@ -89,6 +89,8 @@ class Discordant(discord.Client):
         self.load_aliases()
 
     def load_aliases(self):
+        if 'aliases' not in self.config:
+            return
         aliases = self.config['aliases']
         for base_cmd, alias_list in aliases.items():
             cmd_name = self._aliases[base_cmd]
@@ -177,10 +179,13 @@ class Discordant(discord.Client):
         return wrapper
 
     @classmethod
-    def register_command(cls, name, aliases=None, arg_func=lambda args: args):
-        if aliases is None:
-            aliases = []
-        aliases.append(name)
+    def register_command(cls, name, aliases=None, section=None,
+                         perm_func=lambda author: author,
+                         arg_func=lambda args: args):
+        if not aliases:
+            aliases = [name]
+        else:
+            aliases.insert(0, name)
 
         def wrapper(func):
             if not iscoroutinefunction(func):
@@ -195,7 +200,7 @@ class Discordant(discord.Client):
             setattr(cls, func_name, func)
             cls._commands[func_name] = Command(
                 func_name, arg_func, aliases,
-                func.__module__.split(".")[-1],
+                section or func.__module__.split(".")[-1],
                 utils.cmd_help_format(func.__doc__))
             # associate the given aliases with the command
             for alias in aliases:

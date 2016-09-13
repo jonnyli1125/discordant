@@ -45,7 +45,7 @@ async def _punishment_history(self, member, cursor):
     return output
 
 
-@Discordant.register_command("modhistory")
+@Discordant.register_command("modhistory", ["modh"])
 async def _moderation_history(self, args, message):
     """!modhistory <user>
     displays punishment history for a user."""
@@ -68,7 +68,7 @@ async def _moderation_history(self, args, message):
 async def _mod_cmd(self, args, message, cmd, action):
     server = message.server or self.default_server
     member = server.get_member(message.author.id)
-    if not message.channel.permissions_for(member).kick_members:
+    if not server.default_channel.permissions_for(member).kick_members:
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
@@ -155,7 +155,7 @@ async def _mute(self, args, message):
 async def _mod_remove_cmd(self, args, message, cmd, action):
     server = message.server or self.default_server
     member = server.get_member(message.author.id)
-    if not message.channel.permissions_for(member).kick_members:
+    if not server.default_channel.permissions_for(member).kick_members:
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
@@ -215,7 +215,7 @@ async def _ban(self, args, message):
     bans a user."""
     server = message.server or self.default_server
     member = server.get_member(message.author.id)
-    if not message.channel.permissions_for(member).ban_members:
+    if not server.default_channel.permissions_for(member).ban_members:
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
@@ -270,13 +270,28 @@ async def _ban(self, args, message):
     await self.ban(user)
 
 
+#@Discordant.register_command("unban")
+async def _unban(self, args, message):
+    """!unban <user>
+    unbans a user."""
+    server = message.server or self.default_server
+    member = server.get_member(message.author.id)
+    if not server.default_channel.permissions_for(member).ban_members:
+        await self.send_message(message.channel,
+                                "You are not authorized to use this command.")
+        return
+    if not args:
+        await utils.send_help(self, message, "unban")
+        return
+
+
 @Discordant.register_command("bans")
 async def _bans(self, args, message):
     """!bans
     lists the bans in this server."""
     server = message.server or self.default_server
     member = server.get_member(message.author.id)
-    if not message.channel.permissions_for(member).ban_members:
+    if not server.default_channel.permissions_for(member).ban_members:
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
@@ -294,7 +309,7 @@ async def _reason(self, args, message):
     edits the reason of the given user's most recent punishment."""
     server = message.server or self.default_server
     member = server.get_member(message.author.id)
-    if not message.channel.permissions_for(member).kick_members:
+    if not server.default_channel.permissions_for(member).kick_members:
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return

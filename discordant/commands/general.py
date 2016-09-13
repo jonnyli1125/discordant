@@ -16,7 +16,7 @@ import discordant.utils as utils
 from discordant import Discordant
 
 
-@Discordant.register_command("help")
+@Discordant.register_command("help", ["info", "h", "cmds", "commands"])
 async def _help(self, args, message):
     """!help [command/section]
     displays command help and information."""
@@ -64,7 +64,7 @@ def _help_menu(sections):
     return output
 
 
-@Discordant.register_command("timezone")
+@Discordant.register_command("timezone", ["tz"])
 async def _convert_timezone(self, args, message):
     """!timezone <time> <from> <\*to> or !timezone <\*timezone>
     displays time in given timezone(s)."""
@@ -147,10 +147,10 @@ async def _dict_search_args_parse(self, args, message, cmd, keys=None):
     return (int(limit), query) + ((kwargs,) if keys else ())
 
 
-@Discordant.register_command("jisho")
+@Discordant.register_command("jisho", ["j"])
 async def _jisho_search(self, args, message):
     """!jisho [limit] <query>
-    searches japanese-english dictionary `http://jisho.org`."""
+    searches japanese-english dictionary <http://jisho.org>."""
     search_args = await _dict_search_args_parse(self, args, message, "jisho")
     if not search_args:
         return
@@ -217,7 +217,7 @@ async def _jisho_search(self, args, message):
 @Discordant.register_command("alc")
 async def _alc_search(self, args, message):
     """!alc [limit] <query>
-    searches english-japanese dictionary `http://alc.co.jp`."""
+    searches english-japanese dictionary <http://alc.co.jp>."""
     search_args = await _dict_search_args_parse(self, args, message, "alc")
     if not search_args:
         return
@@ -341,7 +341,7 @@ async def _example_sentence_search(self, args, message, cmd, url):
 @Discordant.register_command("yourei")
 async def _yourei_search(self, args, message):
     """!yourei [limit] <query> [context=bool]
-    Searches Japanese example sentences from `http://yourei.jp`."""
+    Searches Japanese example sentences from <http://yourei.jp>."""
     await _example_sentence_search(
         self, args, message, "yourei", "http://yourei.jp/")
 
@@ -349,7 +349,7 @@ async def _yourei_search(self, args, message):
 @Discordant.register_command("nyanglish")
 async def _nyanglish_search(self, args, message):
     """!nyanglish [limit] <query> [context=bool]
-    searches english example sentences from `http://nyanglish.com`."""
+    searches english example sentences from <http://nyanglish.com>."""
     await _example_sentence_search(
         self, args, message, "nyanglish", "http://nyanglish.com/")
 
@@ -367,7 +367,7 @@ async def _delete_after(self, time, args):
     await f(args)
 
 
-@Discordant.register_command("strokeorder")
+@Discordant.register_command("strokeorder", ["so"])
 async def _stroke_order(self, args, message):
     """!strokeorder <character>
     shows stroke order for a kanji character."""
@@ -411,7 +411,7 @@ def _crop_and_shift_img(img):
     return new_img
 
 
-@Discordant.register_command("showvc")
+@Discordant.register_command("showvc", ["hidevc"])
 async def _show_voice_channels_toggle(self, args, message):
     """!showvc
     toggles visibility to the #voice-\* text channels."""
@@ -438,7 +438,7 @@ async def _show_voice_channels_toggle(self, args, message):
         await _delete_after(self, 5, [message, msg])
 
 
-@Discordant.register_command("readingcircle")
+@Discordant.register_command("readingcircle", ["rc"])
 async def _reading_circle(self, args, message):
     """!readingcircle <beginner/intermediate>
     add/remove yourself to ping notification lists for beginner or intermediate
@@ -462,7 +462,7 @@ async def _reading_circle(self, args, message):
         await _delete_after(self, 5, [message, msg])
 
 
-@Discordant.register_command("tag")
+@Discordant.register_command("tag", ["t"])
 async def _tag(self, args, message):
     """!tag <tag> [content/delete]
     display, add, edit, or delete tags (text stored in the bot's database)."""

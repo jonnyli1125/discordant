@@ -11,7 +11,7 @@ import discordant.utils as utils
 from discordant import Discordant
 
 
-@Discordant.register_command("client")
+@Discordant.register_command("client", ["settings"])
 async def _client_settings(self, args, message):
     """!client [\*\*key=value]
     updates the bot's discord client settings."""
@@ -117,7 +117,7 @@ async def _stats(self, args, message):
             process.memory_info().rss / float(2 ** 20)))
 
 
-@Discordant.register_command("userinfo")
+@Discordant.register_command("userinfo", ["uinfo", "u"])
 async def _userinfo(self, args, message):
     """!userinfo <user>
     displays discord user info for a user."""
@@ -162,7 +162,7 @@ async def _eval(self, args, message):
     await self.send_message(message.channel, utils.python_format(result))
 
 
-@Discordant.register_command("usercmd")
+@Discordant.register_command("usercmd", ["ucmd"])
 async def _usercmd(self, args, message):
     """!usercmd <user> <command>
     executes a command as another user."""
