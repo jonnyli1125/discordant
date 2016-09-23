@@ -17,7 +17,7 @@ from discordant import Discordant
 
 
 @Discordant.register_command("help", ["info", "h", "cmds", "commands"],
-                             context=True, arg_func=utils.has_args)
+                             context=True)
 async def _help(self, args, message, context):
     """!help [command/section]
     displays command help and information."""
@@ -45,20 +45,27 @@ async def _help(self, args, message, context):
             await self.send_message(
                 message.channel, "Command could not be found.")
     else:
-        await utils.send_long_message(self, message.author, _help_menu(
-            sections))
-        await self.send_message(
-            message.author,
-            "**command help syntax**:\n" +
-            "  [] - optional argument\n" +
-            "  <> - required argument\n" +
-            "  \\* - any number of arguments\n" +
-            "  key=value - kwargs style argument (each key-value pair is " +
-            "separated by space, and the key and value are separated by the " +
-            "\"=\" character).\n" +
-            "  \\*\\* - any number of kwargs")
+        msg = None
+        try:
+            await utils.send_long_message(self, message.author, _help_menu(
+                sections))
+            await self.send_message(
+                message.author,
+                "**command help syntax**:\n" +
+                "  [] - optional argument\n" +
+                "  <> - required argument\n" +
+                "  \\* - any number of arguments\n" +
+                "  key=value - kwargs style argument (each key-value pair is " +
+                "separated by space, and the key and value are separated by the " +
+                "\"=\" character).\n" +
+                "  \\*\\* - any number of kwargs")
+        except discord.errors.Forbidden:
+            msg = await self.send_message(
+                message.channel, "Please enable your PMs.")
         if message.server:
-            msg = await self.send_message(message.channel, "Check your PMs.")
+            if not msg:
+                msg = await self.send_message(
+                    message.channel, "Check your PMs.")
             await _delete_after(self, 5, [message, msg])
 
 

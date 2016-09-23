@@ -156,13 +156,14 @@ class Discordant(discord.Client):
                     message.channel,
                     "You are not authorized to use this command.")
                 return
-            if cmd.arg_func and not cmd.arg_func(args):
+            if cmd.arg_func:
                 res = cmd.arg_func(args)
+                if isinstance(res, tuple):
+                    params[0] = res[1]
+                    res = res[0]
                 if not res:
                     await self.send_message(message.channel, cmd.help)
                     return
-                if isinstance(res, tuple):
-                    params[0] = res[1]
             await getattr(self, cmd.name)(*params)
 
     @classmethod

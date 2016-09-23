@@ -47,7 +47,7 @@ def get_from_kwargs(key, kwargs, default):
 
 
 def get_user(search, seq, message=None, strict=False):
-    if re.match(r"<@\d+>", search):
+    if re.match(r"<@!?\d+>", search):
         return discord.utils.get(
             message.mentions if message else seq, mention=search)
     elif re.match(r".+#\d{4}$", search):
