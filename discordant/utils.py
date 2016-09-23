@@ -46,13 +46,13 @@ def get_from_kwargs(key, kwargs, default):
     return kwargs[key] if key in kwargs else default
 
 
-def get_user(search, seq, message=None):
+def get_user(search, seq, message=None, strict=False):
     if re.match(r"<@\d+>", search):
         return discord.utils.get(
             message.mentions if message else seq, mention=search)
     elif re.match(r".+#\d{4}$", search):
         return discord.utils.find(lambda x: search == str(x), seq)
-    else:
+    elif not strict:
         return _general_search(search, seq)
 
 
@@ -201,3 +201,16 @@ def gt_role(self, author, user, include_self=False):
         self_user = self.default_server.get_member(self.user.id)
         author_rank = min(rank(self_user), author_rank)
     return author_rank > rank(user)
+
+
+def has_args(s):
+    return bool(s)
+
+
+def len_args(s, n, *args):
+    split = s.split(*args)
+    return len(split) == n, split
+
+
+def has_permission(user, perm):
+    return getattr(user.server.default_channel.permissions_for(user), perm)

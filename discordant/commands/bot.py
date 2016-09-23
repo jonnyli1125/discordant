@@ -11,16 +11,12 @@ import discordant.utils as utils
 from discordant import Discordant
 
 
-@Discordant.register_command("client", ["settings"])
+@Discordant.register_command("client", ["settings"],
+                             perm_func=utils.is_controller,
+                             arg_func=utils.has_args)
 async def _client_settings(self, args, message):
     """!client [\*\*key=value]
     updates the bot's discord client settings."""
-    if not utils.is_controller(self, message.author):
-        await self.send_message(message.channel,
-                                "You are not authorized to use this command.")
-        return
-    if not args:
-        await utils.send_help(self, message, "client")
     kwargs = utils.get_kwargs(args)
     if "game" in kwargs:
         game = discord.Game(name=kwargs["game"]) if kwargs["game"] else None
@@ -46,43 +42,33 @@ async def _client_settings(self, args, message):
     await self.send_message(message.channel, "Settings updated.")
 
 
-@Discordant.register_command("say")
-async def _say(self, args, message):
+@Discordant.register_command("say", context=True, perm_func=utils.is_controller,
+                             arg_func=lambda a: utils.len_args(a, 2, None, 1))
+async def _say(self, args_split, message, context):
     """!say <channel> <message>
     sends a message to a channel through the bot."""
-    if not utils.is_controller(self, message.author):
-        await self.send_message(message.channel,
-                                "You are not authorized to use this command.")
-        return
-    split = args.split(None, 1)
-    if len(split) <= 1:
-        await utils.send_help(self, message, "say")
-        return
-    server = message.server or self.default_server
-    channel = utils.get_channel(split[0], server.channels, message) \
-        or utils.get_user(split[0], server.members, message)
+    channel = utils.get_channel(
+        args_split[0], context.server.channels, message) or utils.get_user(
+        args_split[0], context.server.members, message)
     if not channel:
         await self.send_message(message.channel, "Channel or user not found.")
         return
-    await self.send_message(channel, split[1])
+    await self.send_message(channel, args_split[1])
 
 
-@Discordant.register_command("edit")
-async def _edit(self, args, message):
+@Discordant.register_command("edit", context=True,
+                             perm_func=utils.is_controller,
+                             arg_func=lambda a: utils.len_args(a, 3, None, 2))
+async def _edit(self, args_split, message, context):
     """!edit <channel> <message id> <message>
     edits a message with that id in the given channel to a new message."""
     if not utils.is_controller(self, message.author):
         await self.send_message(message.channel,
                                 "You are not authorized to use this command.")
         return
-    split = args.split(None, 2)
-    if len(split) <= 2:
-        await utils.send_help(self, message, "edit")
-        return
-    server = message.server or self.default_server
-    channel = utils.get_channel(split[0], server.channels, message)
+    channel = utils.get_channel(args_split[0], context.server.channels, message)
     if not channel:
-        user = utils.get_user(split[0], server.members, message)
+        user = utils.get_user(args_split[0], context.server.members, message)
         if not user:
             await self.send_message(
                 message.channel, "Channel or user not found.")
@@ -92,11 +78,11 @@ async def _edit(self, args, message):
             await self.send_message(
                 message.channel, "No private messages with " + user.name + ".")
             return
-    msg = await self.get_message(channel, split[1])
+    msg = await self.get_message(channel, args_split[1])
     if not msg:
         await self.send_message(message.channel, "Message not found.")
         return
-    await self.edit_message(msg, split[2])
+    await self.edit_message(msg, args_split[2])
 
 
 @Discordant.register_command("uptime")
@@ -117,15 +103,12 @@ async def _stats(self, args, message):
             process.memory_info().rss / float(2 ** 20)))
 
 
-@Discordant.register_command("userinfo", ["uinfo", "u"])
-async def _userinfo(self, args, message):
+@Discordant.register_command("userinfo", ["uinfo", "u"], context=True,
+                             arg_func=utils.has_args)
+async def _userinfo(self, args, message, context):
     """!userinfo <user>
     displays discord user info for a user."""
-    if not args:
-        await utils.send_help(self, message, "userinfo")
-        return
-    server = message.server or self.default_server
-    user = utils.get_user(args, server.members, message)
+    user = utils.get_user(args, context.server.members, message)
     if not user:
         await self.send_message(message.channel, "User could not be found.")
         return
@@ -138,18 +121,13 @@ async def _userinfo(self, args, message):
          "**avatar**: {1}").format(user, utils.get_avatar_url(user)))
 
 
-@Discordant.register_command("eval")
-async def _eval(self, args, message):
+@Discordant.register_command("eval", context=True,
+                             perm_func=utils.is_controller,
+                             arg_func=utils.has_args)
+async def _eval(self, args, message, context):
     """!eval <expression>
     evaluates a python expression in the discordant command context."""
     # taken from Rapptz/RoboDanny's eval command, edited for Discordant
-    if not utils.is_controller(self, message.author):
-        await self.send_message(message.channel,
-                                "You are not authorized to use this command.")
-        return
-    if not args:
-        await utils.send_help(self, message, "eval")
-        return
     try:
         result = eval(args)
         if inspect.isawaitable(result):
@@ -162,23 +140,16 @@ async def _eval(self, args, message):
     await self.send_message(message.channel, utils.python_format(result))
 
 
-@Discordant.register_command("usercmd", ["ucmd"])
-async def _usercmd(self, args, message):
+@Discordant.register_command("usercmd", ["ucmd"], context=True,
+                             perm_func=utils.is_controller,
+                             arg_func=lambda a: utils.len_args(a, 2, None, 1))
+async def _usercmd(self, args_split, message, context):
     """!usercmd <user> <command>
     executes a command as another user."""
-    if not utils.is_controller(self, message.author):
-        await self.send_message(message.channel,
-                                "You are not authorized to use this command.")
-        return
-    split = args.split(None, 1)
-    if len(split) < 2:
-        await utils.send_help(self, message, "ucmd")
-        return
-    server = message.server or self.default_server
-    user = utils.get_user(split[0], server.members, message)
+    user = utils.get_user(args_split[0], context.server.members, message)
     if not user:
         await self.send_message(message.channel, "User could not be found.")
         return
     message.author = user
-    message.content = "!" + split[1]
+    message.content = "!" + args_split[1]
     await self.run_command(message)

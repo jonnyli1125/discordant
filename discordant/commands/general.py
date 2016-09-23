@@ -16,19 +16,28 @@ import discordant.utils as utils
 from discordant import Discordant
 
 
-@Discordant.register_command("help", ["info", "h", "cmds", "commands"])
-async def _help(self, args, message):
+@Discordant.register_command("help", ["info", "h", "cmds", "commands"],
+                             context=True, arg_func=utils.has_args)
+async def _help(self, args, message, context):
     """!help [command/section]
     displays command help and information."""
     sections = {}
     for cmd in self._commands.values():
+        if cmd.perm_func and not cmd.perm_func(self, context.author):
+            continue
         if cmd.section in sections:
             sections[cmd.section].append(cmd)
         else:
             sections[cmd.section] = [cmd]
     if args:
-        if utils.get_cmd(self, args):
-            await utils.send_help(self, message, args)
+        cmd = utils.get_cmd(self, args)
+        if cmd:
+            if cmd.perm_func and not cmd.perm_func(self, context.author):
+                await self.send_message(
+                    message.channel,
+                    "You are not authorized to use this command.")
+                return
+            await self.send_message(message.channel, cmd.help)
         elif args in sections:
             await utils.send_long_message(self, message.channel, _help_menu(
                 {args: sections[args]}))
@@ -64,7 +73,7 @@ def _help_menu(sections):
     return output
 
 
-@Discordant.register_command("timezone", ["tz"])
+@Discordant.register_command("timezone", ["tz"], arg_func=utils.has_args)
 async def _convert_timezone(self, args, message):
     """!timezone <time> <from> <\*to> or !timezone <\*timezone>
     displays time in given timezone(s)."""
@@ -108,9 +117,6 @@ async def _convert_timezone(self, args, message):
         return new_dt.strftime("%I:%M %p %Z") + (
             ", " + relative_date_str(dt, new_dt) if relative else "")
 
-    if not args:
-        await utils.send_help(self, message, "timezone")
-        return
     split = args.split()
     try:
         is_t = is_time(split[0])
@@ -132,9 +138,6 @@ async def _convert_timezone(self, args, message):
 
 
 async def _dict_search_args_parse(self, args, message, cmd, keys=None):
-    if not args:
-        await utils.send_help(self, message, cmd)
-        return
     limit = 1
     query = args
     kwargs = {}
@@ -147,7 +150,7 @@ async def _dict_search_args_parse(self, args, message, cmd, keys=None):
     return (int(limit), query) + ((kwargs,) if keys else ())
 
 
-@Discordant.register_command("jisho", ["j"])
+@Discordant.register_command("jisho", ["j"], arg_func=utils.has_args)
 async def _jisho_search(self, args, message):
     """!jisho [limit] <query>
     searches japanese-english dictionary <http://jisho.org>."""
@@ -214,7 +217,7 @@ async def _jisho_search(self, args, message):
         self, message.channel, output, message.server is not None)
 
 
-@Discordant.register_command("alc")
+@Discordant.register_command("alc", arg_func=utils.has_args)
 async def _alc_search(self, args, message):
     """!alc [limit] <query>
     searches english-japanese dictionary <http://alc.co.jp>."""
@@ -338,7 +341,7 @@ async def _example_sentence_search(self, args, message, cmd, url):
         message.server is not None)
 
 
-@Discordant.register_command("yourei")
+@Discordant.register_command("yourei", arg_func=utils.has_args)
 async def _yourei_search(self, args, message):
     """!yourei [limit] <query> [context=bool]
     Searches Japanese example sentences from <http://yourei.jp>."""
@@ -346,7 +349,7 @@ async def _yourei_search(self, args, message):
         self, args, message, "yourei", "http://yourei.jp/")
 
 
-@Discordant.register_command("nyanglish")
+@Discordant.register_command("nyanglish", arg_func=utils.has_args)
 async def _nyanglish_search(self, args, message):
     """!nyanglish [limit] <query> [context=bool]
     searches english example sentences from <http://nyanglish.com>."""
@@ -367,13 +370,10 @@ async def _delete_after(self, time, args):
     await f(args)
 
 
-@Discordant.register_command("strokeorder", ["so"])
+@Discordant.register_command("strokeorder", ["so"], arg_func=utils.has_args)
 async def _stroke_order(self, args, message):
     """!strokeorder <character>
     shows stroke order for a kanji character."""
-    if not args:
-        await utils.send_help(self, message, "strokeorder")
-        return
     file = str(ord(args[0])) + "_frames.png"
     url = "http://classic.jisho.org/static/images/stroke_diagrams/" + file
     try:
@@ -411,8 +411,8 @@ def _crop_and_shift_img(img):
     return new_img
 
 
-@Discordant.register_command("showvc", ["hidevc"])
-async def _show_voice_channels_toggle(self, args, message):
+@Discordant.register_command("showvc", ["hidevc"], context=True)
+async def _show_voice_channels_toggle(self, args, message, context):
     """!showvc
     toggles visibility to the #voice-\* text channels."""
     query = {"user_id": message.author.id}
@@ -424,54 +424,48 @@ async def _show_voice_channels_toggle(self, args, message):
         dict(query, value=show),
         upsert=True)
     role = discord.utils.get(self.default_server.roles, name="VC Shown")
-    server = message.server or self.default_server
-    member = server.get_member(message.author.id)
     if show:
-        await self.add_roles(member, role)
+        await self.add_roles(context.author, role)
         msg = await self.send_message(message.channel, ":white_check_mark:")
     else:
-        if not member.voice_channel:
-            await self.remove_roles(member, role)
+        if not context.author.voice_channel:
+            await self.remove_roles(context.author, role)
         msg = await self.send_message(
             message.channel, ":negative_squared_cross_mark:")
     if message.server:
         await _delete_after(self, 5, [message, msg])
 
 
-@Discordant.register_command("readingcircle", ["rc"])
-async def _reading_circle(self, args, message):
+@Discordant.register_command("readingcircle", ["rc"], context=True)
+async def _reading_circle(self, args, message, context):
     """!readingcircle <beginner/intermediate>
     add/remove yourself to ping notification lists for beginner or intermediate
     reading circles."""
     try:
-        server = message.server or self.default_server
-        author = server.get_member(message.author.id)
         role_name = "Reading Circle " + args[0].upper() + args[1:].lower()
-        role = discord.utils.get(server.roles, name=role_name)
-        if role in author.roles:
-            await self.remove_roles(author, role)
+        role = discord.utils.get(context.server.roles, name=role_name)
+        if role in context.author.roles:
+            await self.remove_roles(context.author, role)
             msg = await self.send_message(
                 message.channel, ":negative_squared_cross_mark:")
         else:
-            await self.add_roles(author, role)
+            await self.add_roles(context.author, role)
             msg = await self.send_message(message.channel, ":white_check_mark:")
     except (AttributeError, IndexError):
-        msg = await self.send_message(
-            message.channel, "!readingcircle <beginner/intermediate>")
+        msg = await self.send_message(message.channel, context.cmd.help)
     if message.server:
         await _delete_after(self, 5, [message, msg])
 
 
-@Discordant.register_command("tag", ["t"])
-async def _tag(self, args, message):
+@Discordant.register_command("tag", ["t"], context=True)
+async def _tag(self, args, message, context):
     """!tag <tag> [content/delete]
     display, add, edit, or delete tags (text stored in the bot's database)."""
     collection = self.mongodb.tags
     if not args:
         await self.send_message(
             message.channel,
-            utils.cmd_help_format(utils.get_cmd(self, "tag")) + "\nTags: " +
-            ", ".join(
+            context.cmd.help + "\nTags: " + ", ".join(
                 [x["tag"] for x in await collection.find().to_list(None)]))
         return
     split = args.split(None, 1)
@@ -479,18 +473,17 @@ async def _tag(self, args, message):
     content = split[1] if len(split) > 1 else None
     query = {"tag": tag}
     cursor = await collection.find(query).to_list(None)
-    if not message.server:
-        message.author = self.default_server.get_member(message.author.id)
 
     def has_permission(user):
         return cursor[0]["owner"] == user.id or \
-               message.channel.permissions_for(user).manage_messages
+               context.server.default_channel.permissions_for(
+                   user).manage_messages
 
     if content == "delete":
         if not cursor:
             await self.send_message(message.channel, "Tag could not be found.")
             return
-        if not has_permission(message.author):
+        if not has_permission(context.author):
             await self.send_message(
                 message.channel, "You're not allowed to delete this tag.")
             return
@@ -502,7 +495,7 @@ async def _tag(self, args, message):
                 {"tag": tag, "content": content, "owner": message.author.id})
             await self.send_message(message.channel, "Added tag: " + tag)
         else:
-            if not has_permission(message.author):
+            if not has_permission(context.author):
                 await self.send_message(
                     message.channel, "You're not allowed to edit this tag.")
                 return
@@ -514,12 +507,10 @@ async def _tag(self, args, message):
             cursor[0]["content"] if cursor else "Tag could not be found")
 
 
-@Discordant.register_command("studying")
-async def _studying(self, args, message):
+@Discordant.register_command("studying", context=True)
+async def _studying(self, args, message, context):
     """!studying <resource>
     add/remove a studying resource tag to yourself."""
-    server = message.server or self.default_server
-    author = server.get_member(message.author.id)
     collection = self.mongodb.studying_resources
     obj = await collection.find_one()
     if obj:
@@ -530,37 +521,36 @@ async def _studying(self, args, message):
     if not args:
         await self.send_message(
             message.channel,
-            utils.cmd_help_format(utils.get_cmd(self, "studying")) +
-            "\nResources: " + ", ".join(role_names))
+            context.cmd.help + "\nResources: " + ", ".join(role_names))
         return
     split = args.split(None, 1)
     if len(split) > 1:
         subcmd = split[0]
         resource = split[1]
-        role = discord.utils.get(server.roles, name=resource)
+        role = discord.utils.get(context.server.roles, name=resource)
         if subcmd == "add":
-            if not utils.is_controller(self, author):
+            if not utils.is_controller(self, context.author):
                 await self.send_message(
                     message.channel, "You're not allowed to do that.")
                 return
             await collection.update({}, {"$push": {"value": resource}})
             if not role:
                 await self.create_role(
-                    server,
+                    context.server,
                     name=resource,
-                    permissions=server.default_role.permissions,
+                    permissions=context.server.default_role.permissions,
                     mentionable=True)
             await self.send_message(
                 message.channel, "Added studying resource: " + resource)
             return
         if subcmd == "del":
-            if not utils.is_controller(self, author):
+            if not utils.is_controller(self, context.author):
                 await self.send_message(
                     message.channel, "You're not allowed to do that.")
                 return
             await collection.update({}, {"$pull": {"value": resource}})
             if role:
-                await self.delete_role(server, role)
+                await self.delete_role(context.server, role)
             await self.send_message(
                 message.channel, "Deleted studying resource: " + resource)
             return
@@ -573,17 +563,17 @@ async def _studying(self, args, message):
         a = search_str(args)
         return n == a or n.startswith(a) or n in a
 
-    roles = [discord.utils.get(server.roles, name=x) for x in role_names]
+    roles = [discord.utils.get(context.server.roles, name=x) for x in role_names]
     role = discord.utils.find(find_role, roles)
     if not role:
         await self.send_message(message.channel, "Resource could not be found.")
         return
-    if role in author.roles:
-        await self.remove_roles(author, role)
+    if role in context.author.roles:
+        await self.remove_roles(context.author, role)
         msg = await self.send_message(
             message.channel, ":negative_squared_cross_mark:")
     else:
-        await self.add_roles(author, role)
+        await self.add_roles(context.author, role)
         msg = await self.send_message(message.channel, ":white_check_mark:")
     if message.server:
         await _delete_after(self, 5, [message, msg])

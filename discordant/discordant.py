@@ -14,7 +14,8 @@ import motor.motor_asyncio
 import discordant.utils as utils
 
 Command = namedtuple('Command', ['name', 'arg_func', 'aliases', 'section',
-                                 'help'])
+                                 'help', 'context', 'perm_func'])
+Context = namedtuple('Context', ['server', 'author', 'cmd', 'cmd_name'])
 
 
 def decorate_all_events():
@@ -143,10 +144,26 @@ class Discordant(discord.Client):
         args = split[1] if len(split) > 1 else ""
 
         if cmd_name in self._aliases:
-            cmd = self._commands[self._aliases[cmd_name]]
-            args = cmd.arg_func(args)
             self.commands_parsed += 1
-            await getattr(self, cmd.name)(args, message)
+            cmd = self._commands[self._aliases[cmd_name]]
+            params = [args, message]
+            server = message.server or self.default_server
+            author = server.get_member(message.author.id)
+            if cmd.context:
+                params.append(Context(server, author, cmd, cmd_name))
+            if cmd.perm_func and not cmd.perm_func(self, author):
+                await self.send_message(
+                    message.channel,
+                    "You are not authorized to use this command.")
+                return
+            if cmd.arg_func and not cmd.arg_func(args):
+                res = cmd.arg_func(args)
+                if not res:
+                    await self.send_message(message.channel, cmd.help)
+                    return
+                if isinstance(res, tuple):
+                    params[0] = res[1]
+            await getattr(self, cmd.name)(*params)
 
     @classmethod
     def register_handler(cls, trigger, regex_flags=0):
@@ -179,9 +196,8 @@ class Discordant(discord.Client):
         return wrapper
 
     @classmethod
-    def register_command(cls, name, aliases=None, section=None,
-                         perm_func=lambda author: author,
-                         arg_func=lambda args: args):
+    def register_command(cls, name, aliases=None, section=None, context=False,
+                         perm_func=None, arg_func=None):
         if not aliases:
             aliases = [name]
         else:
@@ -201,7 +217,7 @@ class Discordant(discord.Client):
             cls._commands[func_name] = Command(
                 func_name, arg_func, aliases,
                 section or func.__module__.split(".")[-1],
-                utils.cmd_help_format(func.__doc__))
+                utils.cmd_help_format(func.__doc__), context, perm_func)
             # associate the given aliases with the command
             for alias in aliases:
                 if alias in cls._aliases:

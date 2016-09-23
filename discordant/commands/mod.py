@@ -45,15 +45,20 @@ async def _punishment_history(self, member, cursor):
     return output
 
 
-@Discordant.register_command("modhistory", ["modh"])
-async def _moderation_history(self, args, message):
+def _can_kick(self, user):
+    return utils.has_permission(user, "kick_members")
+
+
+def _can_ban(self, user):
+    return utils.has_permission(user, "ban_members")
+
+
+@Discordant.register_command("modhistory", ["modh"], context=True,
+                             arg_func=utils.has_args, perm_func=_can_kick)
+async def _moderation_history(self, args, message, context):
     """!modhistory <user>
     displays punishment history for a user."""
-    if not args:
-        await utils.send_help(self, message, "modhistory")
-        return
-    server = message.server or self.default_server
-    user = utils.get_user(args, server.members, message)
+    user = utils.get_user(args, context.server.members, message)
     if not user:
         await self.send_message(message.channel, "User could not be found.")
         return
@@ -65,16 +70,14 @@ async def _moderation_history(self, args, message):
         if cursor else user.name + " has no punishment history.")
 
 
-async def _mod_cmd(self, args, message, cmd, action):
-    server = message.server or self.default_server
-    member = server.get_member(message.author.id)
-    if not server.default_channel.permissions_for(member).kick_members:
-        await self.send_message(message.channel,
-                                "You are not authorized to use this command.")
-        return
-    if not args:
-        await utils.send_help(self, message, cmd)
-        return
+_mod_cmd_to_action = {"warn": "warning",
+                      "mute": "mute",
+                      "ban": "ban",
+                      "unwarn": "remove warning",
+                      "unmute": "remove mute"}
+
+
+async def _mod_cmd(self, args, message, context):
     keys = ["duration", "reason"]
     kwargs = utils.get_kwargs(args, keys)
     split = shlex.split(args)
@@ -83,22 +86,24 @@ async def _mod_cmd(self, args, message, cmd, action):
         args = split[0] + ' reason="' + " ".join(split[1:]) + '"'
         kwargs = utils.get_kwargs(args, keys)
     user_search = utils.strip_kwargs(args, keys)
-    user = utils.get_user(user_search, server.members, message)
+    user = utils.get_user(user_search, context.server.members, message)
     if not user:
         await self.send_message(message.channel, "User could not be found.")
         return
-    if not utils.gt_role(self, member, user, True):
-        await self.send_message(message.channel,
-                                "Cannot {} {}".format(cmd, user.name))
+    if not utils.gt_role(self, context.author, user, True):
+        await self.send_message(
+            message.channel, "Cannot {} {}".format(context.cmd_name, user.name))
         return
     duration = utils.get_from_kwargs(
-        "duration", kwargs, self.config["moderation"][cmd + "_duration"])
+        "duration", kwargs,
+        self.config["moderation"][context.cmd_name + "_duration"])
     try:
         duration = float(duration)
     except ValueError:
         await self.send_message(message.channel, "Invalid duration.")
         return
     reason = utils.get_from_kwargs("reason", kwargs, "No reason given.")
+    action = _mod_cmd_to_action[context.cmd_name]
     role = utils.action_to_role(self, action)
     collection = self.mongodb.punishments
     if await utils.is_punished(self, user, action):
@@ -138,47 +143,41 @@ async def _mod_cmd(self, args, message, cmd, action):
     await utils.add_punishment_timer(self, user, action)
 
 
-@Discordant.register_command("warn")
-async def _warn(self, args, message):
+@Discordant.register_command("warn", context=True,
+                             arg_func=utils.has_args, perm_func=_can_kick)
+async def _warn(self, args, message, context):
     """!warn <user> [reason] or !warn <user> [duration=hours] [reason=str]
     warns a user."""
-    await _mod_cmd(self, args, message, "warn", "warning")
+    await _mod_cmd(self, args, message, context)
 
 
-@Discordant.register_command("mute")
-async def _mute(self, args, message):
+@Discordant.register_command("mute", context=True,
+                             arg_func=utils.has_args, perm_func=_can_kick)
+async def _mute(self, args, message, context):
     """!mute <user> [reason] or !mute <user> [duration=hours] [reason=str]
     mutes a user."""
-    await _mod_cmd(self, args, message, "mute", "mute")
+    await _mod_cmd(self, args, message, context)
 
 
-async def _mod_remove_cmd(self, args, message, cmd, action):
-    server = message.server or self.default_server
-    member = server.get_member(message.author.id)
-    if not server.default_channel.permissions_for(member).kick_members:
-        await self.send_message(message.channel,
-                                "You are not authorized to use this command.")
-        return
-    if not args:
-        await utils.send_help(self, message, cmd)
-        return
+async def _mod_remove_cmd(self, args, message, context):
     split = shlex.split(args)
     user_search = split[0]
     reason = " ".join(split[1:]) if len(split) > 1 else "No reason given."
-    user = utils.get_user(user_search, server.members, message)
+    user = utils.get_user(user_search, context.server.members, message)
     if not user:
         await self.send_message(message.channel, "User could not be found.")
         return
-    if not utils.gt_role(self, member, user, True):
-        await self.send_message(message.channel,
-                                "Cannot {} {}".format(cmd, user.name))
+    if not utils.gt_role(self, context.author, user, True):
+        await self.send_message(
+            message.channel, "Cannot {} {}".format(context.cmd_name, user.name))
         return
     collection = self.mongodb.punishments
+    action = _mod_cmd_to_action[context.cmd_name]
     orig_action = action.replace("remove ", "")
     role = utils.action_to_role(self, orig_action)
     if not await utils.is_punished(self, user, orig_action):
         await self.send_message(
-            message.channel, user.name + " has no active " + action + ".")
+            message.channel, user.name + " has no active " + orig_action + ".")
         return
     document = {
         "user_id": user.id,
@@ -195,41 +194,34 @@ async def _mod_remove_cmd(self, args, message, cmd, action):
         _punishment_format(self, message.server, document))
 
 
-@Discordant.register_command("unwarn")
-async def _unwarn(self, args, message):
+@Discordant.register_command("unwarn", context=True,
+                             arg_func=utils.has_args, perm_func=_can_kick)
+async def _unwarn(self, args, message, context):
     """!unwarn <user> [reason]
     removes a warning for a user."""
-    await _mod_remove_cmd(self, args, message, "unwarn", "remove warning")
+    await _mod_remove_cmd(self, args, message, context)
 
 
-@Discordant.register_command("unmute")
-async def _unmute(self, args, message):
+@Discordant.register_command("unmute", context=True,
+                             arg_func=utils.has_args, perm_func=_can_kick)
+async def _unmute(self, args, message, context):
     """!unmute <user> [reason]
     removes a mute for a user."""
-    await _mod_remove_cmd(self, args, message, "unmute", "remove mute")
+    await _mod_remove_cmd(self, args, message, context)
 
 
-@Discordant.register_command("ban")
-async def _ban(self, args, message):
+@Discordant.register_command("ban", context=True,
+                             arg_func=utils.has_args, perm_func=_can_ban)
+async def _ban(self, args, message, context):
     """!ban <user/user id> [reason]
     bans a user."""
-    server = message.server or self.default_server
-    member = server.get_member(message.author.id)
-    if not server.default_channel.permissions_for(member).ban_members:
-        await self.send_message(message.channel,
-                                "You are not authorized to use this command.")
-        return
-    if not args:
-        await utils.send_help(self, message, "ban")
-        return
     split = shlex.split(args)
     user_search = split[0]
     reason = " ".join(split[1:]) if len(split) > 1 else "No reason given."
-    user = utils.get_user(user_search, server.members, message)
+    user = utils.get_user(user_search, context.server.members, message, True)
     if not user:
         await self.send_message(
-            message.channel,
-            "User could not be found.\nIf this is a user ID, type y/n.")
+            message.channel, "User could not be found.\nSearch logs? Type y/n.")
         reply = await self.wait_for_message(
             check=lambda m: m.author == message.author and
                             (m.content.lower() == "y" or
@@ -238,20 +230,25 @@ async def _ban(self, args, message):
         if not reply or reply.content.lower() == "n":
             await self.send_message(message.channel, "Cancelled ban.")
             return
-        else:
-            user = discord.Member(
-                id=user_search,
-                name=user_search,
-                discriminator="",
-                server=server)
-    else:
-        if not utils.gt_role(self, member, user, True):
-            await self.send_message(message.channel,
-                                    "Cannot ban " + user.name)
+        authors = set()
+        for channel in context.server.channels:
+            if channel in [self.staff_channel, self.testing_channel,
+                           self.log_channel] or \
+                            channel.type != discord.ChannelType.text:
+                continue
+            async for msg in self.logs_from(channel, limit=500):
+                authors.add(msg.author)
+        user = utils.get_user(user_search, authors)
+        if not user:
+            await self.send_message(
+                message.channel, "User could not be found.")
             return
+    elif not utils.gt_role(self, context.author, user, True):
+        await self.send_message(message.channel, "Cannot ban " + user.name)
+        return
     collection = self.mongodb.punishments
     doc = await collection.find_one({"user_id": user.id, "action": "ban"})
-    if doc or user in await self.get_bans(server):
+    if doc or user in await self.get_bans(context.server):
         await self.send_message(
             message.channel, user.name + " is already banned.")
         return
@@ -270,57 +267,50 @@ async def _ban(self, args, message):
     await self.ban(user)
 
 
-#@Discordant.register_command("unban")
-async def _unban(self, args, message):
+#@Discordant.register_command("unban", context=True,
+#                             arg_func=utils.has_args, perm_func=_can_ban)
+async def _unban(self, args, message, context):
     """!unban <user>
     unbans a user."""
-    server = message.server or self.default_server
-    member = server.get_member(message.author.id)
-    if not server.default_channel.permissions_for(member).ban_members:
-        await self.send_message(message.channel,
-                                "You are not authorized to use this command.")
-        return
-    if not args:
-        await utils.send_help(self, message, "unban")
-        return
+    pass
 
 
-@Discordant.register_command("bans")
-async def _bans(self, args, message):
-    """!bans
+@Discordant.register_command("bans", context=True, perm_func=_can_ban)
+async def _bans(self, args, message, context):
+    """!bans [page]
     lists the bans in this server."""
-    server = message.server or self.default_server
-    member = server.get_member(message.author.id)
-    if not server.default_channel.permissions_for(member).ban_members:
-        await self.send_message(message.channel,
-                                "You are not authorized to use this command.")
+    page = int(args) if args.isdigit() else 0
+    page_length = 10
+    bans = await self.get_bans(context.server)
+    len_bans = len(bans)
+    pages = -(-len_bans // page_length)  # ceil division
+    if page > pages:
+        await self.send_message(
+            message.channel, "There are only {} pages available.".format(pages))
         return
-    bans = await self.get_bans(server)
+    start = page * page_length
+    end = (page + 1) * page_length
     await self.send_message(
         message.channel,
         utils.python_format(
-            "\n".join(["{0}. {1} ({1.id})".format(index + 1, user)
-                       for index, user in enumerate(bans)])))
+            "\n".join(["{0}. {1} ({1.id})".format(start + index + 1, user)
+                       for index, user in enumerate(bans[start:end])]) +
+            "\npage {} out of {}".format(page, pages)))
 
 
-@Discordant.register_command("reason")
-async def _reason(self, args, message):
+@Discordant.register_command("reason", context=True,
+                             arg_func=utils.has_args, perm_func=_can_kick)
+async def _reason(self, args, message, context):
     """!reason <user> <reason>
     edits the reason of the given user's most recent punishment."""
-    server = message.server or self.default_server
-    member = server.get_member(message.author.id)
-    if not server.default_channel.permissions_for(member).kick_members:
-        await self.send_message(message.channel,
-                                "You are not authorized to use this command.")
-        return
     split = shlex.split(args)
     if len(split) < 2:
-        await utils.send_help(self, message, "reason")
+        await self.send_message(message.channel, context.cmd.help)
         return
     user_search = split[0]
     reason = " ".join(split[1:])
-    user = utils.get_user(user_search, server.members, message) or \
-        utils.get_user(user_search, await self.get_bans(server))
+    user = utils.get_user(user_search, context.server.members, message) or \
+        utils.get_user(user_search, await self.get_bans(context.server))
     if not user:
         await self.send_message(message.channel, "User could not be found.")
         return
@@ -333,8 +323,8 @@ async def _reason(self, args, message):
             message.channel, user.name + " has no punishment history.")
         return
     doc = cursor[0]
-    moderator = server.get_member(doc["moderator_id"])
-    if utils.gt_role(self, moderator, member):
+    moderator = context.server.get_member(doc["moderator_id"])
+    if utils.gt_role(self, moderator, context.author):
         await self.send_message(
             message.channel,
             "Cannot edit punishment issued by moderator of higher role.")
