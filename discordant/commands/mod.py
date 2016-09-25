@@ -226,11 +226,12 @@ async def _ban(self, args, message, context):
             "Please use an @ mention string or name#id.\n"
             "Search logs? Type y/n.")
         reply = await self.wait_for_message(
-            check=lambda m: m.author == message.author and
-                            (m.content.lower() == "y" or
-                             m.content.lower() == "n"),
+            check=lambda m: m.author == message.author and (
+                m.content.lower() == "y" or m.content.lower() == "n"),
             timeout=60)
-        if not reply or reply.content.lower() == "n":
+        if not reply:  # if no reply, cancel silently to avoid confusion
+            return
+        if reply.content.lower() == "n":
             await self.send_message(message.channel, "Cancelled ban.")
             return
         authors = set()
