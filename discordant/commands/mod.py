@@ -221,7 +221,10 @@ async def _ban(self, args, message, context):
     user = utils.get_user(user_search, context.server.members, message, True)
     if not user:
         await self.send_message(
-            message.channel, "User could not be found.\nSearch logs? Type y/n.")
+            message.channel,
+            "User could not be found. "
+            "Please use an @ mention string or name#id.\n"
+            "Search logs? Type y/n.")
         reply = await self.wait_for_message(
             check=lambda m: m.author == message.author and
                             (m.content.lower() == "y" or
@@ -279,12 +282,12 @@ async def _unban(self, args, message, context):
 async def _bans(self, args, message, context):
     """!bans [page]
     lists the bans in this server."""
-    page = int(args) if args.isdigit() else 0
     page_length = 10
     bans = await self.get_bans(context.server)
     len_bans = len(bans)
     pages = -(-len_bans // page_length)  # ceil division
-    if page > pages:
+    page = int(args) - 1 if args.isdigit() else pages - 1
+    if page >= pages or page < 0:
         await self.send_message(
             message.channel, "There are only {} pages available.".format(pages))
         return
@@ -295,7 +298,7 @@ async def _bans(self, args, message, context):
         utils.python_format(
             "\n".join(["{0}. {1} ({1.id})".format(start + index + 1, user)
                        for index, user in enumerate(bans[start:end])]) +
-            "\npage {} out of {}".format(page, pages)))
+            "\npage {} out of {}".format(page + 1, pages)))
 
 
 @Discordant.register_command("reason", context=True,

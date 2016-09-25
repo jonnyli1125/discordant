@@ -51,13 +51,13 @@ async def _help(self, args, message, context):
                 sections))
             await self.send_message(
                 message.author,
-                "**command help syntax**:\n" +
-                "  [] - optional argument\n" +
-                "  <> - required argument\n" +
-                "  \\* - any number of arguments\n" +
-                "  key=value - kwargs style argument (each key-value pair is " +
-                "separated by space, and the key and value are separated by the " +
-                "\"=\" character).\n" +
+                "**command help syntax**:\n"
+                "  [] - optional argument\n"
+                "  <> - required argument\n"
+                "  \\* - any number of arguments\n"
+                "  key=value - kwargs style argument (each key-value pair is "
+                "separated by space, and the key and value are separated by the"
+                " \"=\" character).\n"
                 "  \\*\\* - any number of kwargs")
         except discord.errors.Forbidden:
             msg = await self.send_message(
