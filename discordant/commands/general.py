@@ -59,6 +59,10 @@ async def _help(self, args, message, context):
                 "separated by space, and the key and value are separated by the"
                 " \"=\" character).\n"
                 "  \\*\\* - any number of kwargs")
+            await self.send_message(
+                message.author,
+                "Type !help [command/section] to display more information "
+                "about a certain command or section.")
         except discord.errors.Forbidden:
             msg = await self.send_message(
                 message.channel, "Please enable your PMs.")
