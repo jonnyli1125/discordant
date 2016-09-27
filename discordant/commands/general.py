@@ -148,7 +148,7 @@ async def _convert_timezone(self, args, message):
                                 ": Not a valid time format or time zone code.")
 
 
-async def _dict_search_args_parse(self, args, message, cmd, keys=None):
+def _dict_search_args_parse(args, keys=None):
     limit = 1
     query = args
     kwargs = {}
@@ -165,10 +165,13 @@ async def _dict_search_args_parse(self, args, message, cmd, keys=None):
 async def _jisho_search(self, args, message):
     """!jisho [limit] <query>
     searches japanese-english dictionary <http://jisho.org>."""
-    search_args = await _dict_search_args_parse(self, args, message, "jisho")
+    search_args = _dict_search_args_parse(args)
     if not search_args:
         return
     limit, query = search_args
+    if "#kanji" in query:
+        await _jisho_kanji(self, limit, query, message)
+        return
     url = "http://jisho.org/api/v1/search/words?keyword=" + \
           urllib.parse.quote(query, encoding="utf-8")
     try:
@@ -228,11 +231,75 @@ async def _jisho_search(self, args, message):
         self, message.channel, output, message.server is not None)
 
 
+async def _jisho_kanji(self, limit, query, message):
+    url = "http://jisho.org/search/" + urllib.parse.quote(
+        query, encoding="utf-8")
+    try:
+        with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                data = await response.text()
+    except Exception as e:
+        await self.send_message(message.channel, "Request failed: " + str(e))
+        return
+    tree = html.fromstring(data)
+    info_div = tree.xpath('//div[@class="kanji details"]')
+    if info_div:
+        await self.send_message(message.channel, _jisho_kanji_info(tree))
+        return
+    results_div = tree.xpath('//div[@class="kanji_light_block"]')
+    if not results_div:
+        await self.send_message(message.channel, "No results found.")
+        return
+    results_divs = results_div[0].xpath(
+        './div[@class="entry kanji_light clearfix"]')[:limit]
+    output = ""
+    for result_div in results_divs:
+        k_url = result_div.xpath(
+            'a[@class="light-details_link"]')[0].attrib["href"]
+        try:
+            with aiohttp.ClientSession() as session:
+                async with session.get(k_url) as response:
+                    k_data = await response.text()
+        except Exception as e:
+            output += "Request failed: {}, {}".format(k_url, e) + "\n"
+            continue
+        output += _jisho_kanji_info(html.fromstring(k_data)) + "\n"
+    await self.send_message(message.channel, output.strip())
+
+
+def _jisho_kanji_info(tree):
+    details = tree.xpath('//div[@class="kanji details"]')[0]
+
+    def remove_spaces(s, all=False):
+        return re.sub(r"\s?", "", s) if all else re.sub(r"\s+", " ", s).strip()
+
+    character = remove_spaces(
+        details.xpath('//h1[@class="character"]')[0].text_content())
+    meanings = remove_spaces(details.xpath(
+        '//div[@class="kanji-details__main-meanings"]')[0].text_content())
+    strokes = remove_spaces(details.xpath(
+        '//div[@class="kanji-details__stroke_count"]')[0].text_content())
+    stats_div = details.xpath('//div[@class="kanji_stats"]')[0]
+    stats = " ".join([remove_spaces(x.text_content()) + "."
+                      for x in stats_div.xpath('./div')])
+    readings_div = details.xpath(
+        '//div[@class="kanji-details__main-readings"]')[0]
+    readings = "\n".join([remove_spaces(x.text_content()).replace("、", ",")
+                          for x in readings_div])
+    radicals_divs = [x[0] for x in details.xpath('//div[@class="radicals"]')]
+    radical = remove_spaces(radicals_divs[0].text_content())
+    parts_div = radicals_divs[1]
+    parts = "Parts: " + ", ".join(
+        remove_spaces(parts_div.xpath("./dd")[0].text_content(), True))
+    return "**{}** {}\n*{}. {}*\n{}\n{}\n{}".format(
+        character, meanings, strokes, stats, readings, radical, parts)
+
+
 @Discordant.register_command("alc", arg_func=utils.has_args)
 async def _alc_search(self, args, message):
     """!alc [limit] <query>
     searches english-japanese dictionary <http://alc.co.jp>."""
-    search_args = await _dict_search_args_parse(self, args, message, "alc")
+    search_args = _dict_search_args_parse(args)
     if not search_args:
         return
     limit, query = search_args
@@ -295,8 +362,7 @@ async def _dict_search_link(self, match, message, cmd, group):
 
 @Discordant.register_handler(r"http:\/\/jisho\.org\/(search|word)\/(\S*)")
 async def _jisho_link(self, match, message):
-    if "%23" not in match.group(2):
-        await _dict_search_link(self, match, message, "jisho", 2)
+    await _dict_search_link(self, match, message, "jisho", 2)
 
 
 @Discordant.register_handler(r"http:\/\/eow\.alc\.co\.jp\/search\?q=([^\s&]*)")
@@ -305,8 +371,7 @@ async def _alc_link(self, match, message):
 
 
 async def _example_sentence_search(self, args, message, cmd, url):
-    search_args = await _dict_search_args_parse(self, args, message, cmd,
-                                                ["context"])
+    search_args = _dict_search_args_parse(args, ["context"])
     if not search_args:
         return
     limit, query, kwargs = search_args
