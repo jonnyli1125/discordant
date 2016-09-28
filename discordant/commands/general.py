@@ -148,7 +148,9 @@ async def _convert_timezone(self, args, message):
                                 ": Not a valid time format or time zone code.")
 
 
-def _dict_search_args_parse(args, keys=None):
+def _search_args(args, keys=None):
+    if not utils.has_args(args):
+        return False
     limit = 1
     query = args
     kwargs = {}
@@ -158,17 +160,15 @@ def _dict_search_args_parse(args, keys=None):
     result = re.match(r"^([0-9]+)\s+(.*)$", query)
     if result:
         limit, query = [result.group(x) for x in (1, 2)]
-    return (int(limit), query) + ((kwargs,) if keys else ())
+    args_tuple = (int(limit), query) + ((kwargs,) if keys else ())
+    return True, args_tuple
 
 
-@Discordant.register_command("jisho", ["j"], arg_func=utils.has_args)
-async def _jisho_search(self, args, message):
+@Discordant.register_command("jisho", ["j"], arg_func=_search_args)
+async def _jisho_search(self, args_tuple, message):
     """!jisho [limit] <query>
     searches japanese-english dictionary <http://jisho.org>."""
-    search_args = _dict_search_args_parse(args)
-    if not search_args:
-        return
-    limit, query = search_args
+    limit, query = args_tuple
     if "#kanji" in query:
         await _jisho_kanji(self, limit, query, message)
         return
@@ -295,14 +295,11 @@ def _jisho_kanji_info(tree):
         character, meanings, strokes, stats, readings, radical, parts)
 
 
-@Discordant.register_command("alc", arg_func=utils.has_args)
-async def _alc_search(self, args, message):
+@Discordant.register_command("alc", arg_func=_search_args)
+async def _alc_search(self, args_tuple, message):
     """!alc [limit] <query>
     searches english-japanese dictionary <http://alc.co.jp>."""
-    search_args = _dict_search_args_parse(args)
-    if not search_args:
-        return
-    limit, query = search_args
+    limit, query = args_tuple
     url = "http://eow.alc.co.jp/search?q=" + \
           urllib.parse.quote(
               re.sub(r"\s+", "+", query), encoding="utf-8", safe="+")
@@ -370,11 +367,8 @@ async def _alc_link(self, match, message):
     await _dict_search_link(self, match, message, "alc", 1)
 
 
-async def _example_sentence_search(self, args, message, cmd, url):
-    search_args = _dict_search_args_parse(args, ["context"])
-    if not search_args:
-        return
-    limit, query, kwargs = search_args
+async def _example_sentence_search(self, args_tuple, message, cmd, url):
+    limit, query, kwargs = args_tuple
     context = kwargs["context"].lower() in ("true", "t", "yes", "y", "1") \
         if "context" in kwargs else False
     url = url + urllib.parse.quote(re.sub(r"\s+", "-", query), encoding="utf-8")
@@ -417,20 +411,24 @@ async def _example_sentence_search(self, args, message, cmd, url):
         message.server is not None)
 
 
-@Discordant.register_command("yourei", arg_func=utils.has_args)
-async def _yourei_search(self, args, message):
+def _search_args_context(args):
+    return _search_args(args, ["context"])
+
+
+@Discordant.register_command("yourei", arg_func=_search_args_context)
+async def _yourei_search(self, args_tuple, message):
     """!yourei [limit] <query> [context=bool]
     Searches Japanese example sentences from <http://yourei.jp>."""
     await _example_sentence_search(
-        self, args, message, "yourei", "http://yourei.jp/")
+        self, args_tuple, message, "yourei", "http://yourei.jp/")
 
 
-@Discordant.register_command("nyanglish", arg_func=utils.has_args)
-async def _nyanglish_search(self, args, message):
+@Discordant.register_command("nyanglish", arg_func=_search_args_context)
+async def _nyanglish_search(self, args_tuple, message):
     """!nyanglish [limit] <query> [context=bool]
     searches english example sentences from <http://nyanglish.com>."""
     await _example_sentence_search(
-        self, args, message, "nyanglish", "http://nyanglish.com/")
+        self, args_tuple, message, "nyanglish", "http://nyanglish.com/")
 
 
 @Discordant.register_handler(r"http:\/\/(yourei\.jp|nyanglish\.com)\/(\S+)")
@@ -653,3 +651,34 @@ async def _studying(self, args, message, context):
         msg = await self.send_message(message.channel, ":white_check_mark:")
     if message.server:
         await _delete_after(self, 5, [message, msg])
+
+
+async def _google_search(self, args_tuple, message, cse_key):
+    api_key = self.config["api-keys"]["google"]
+    cse_id = self.config["api-keys"]["cse"][cse_key]
+    limit, query = args_tuple
+    url = ("https://www.googleapis.com/customsearch/v1"
+           "?key={}&cx={}&q={}&fields=items(title,link)".format(
+              api_key, cse_id, urllib.parse.quote(query, encoding="utf-8")))
+    try:
+        with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                data = await response.json()
+    except Exception as e:
+        await self.send_message(message.channel, "Request failed: " + str(e))
+        return
+    if not data:
+        await self.send_message(message.channel, "No results found.")
+        return
+    items = data["items"][:limit]
+    fmt = "**{index}.** {title} - <{link}>" \
+        if len(items) > 1 else "{title} - {link}"
+    results = [fmt.format(**x, index=i) for i, x in enumerate(items)]
+    await self.send_message(message.channel, "\n".join(results))
+
+
+@Discordant.register_command("taekim", ["tk"], arg_func=_search_args)
+async def _taekim_search(self, args_tuple, message):
+    """!taekim [limit] <query>
+    Searches Tae Kim's Guide to Japanese - http://guidetojapanese.org/"""
+    await _google_search(self, args_tuple, message, "taekim")

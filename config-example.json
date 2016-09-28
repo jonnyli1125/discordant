@@ -11,7 +11,10 @@
 		"help": ["commands", "cmds"]
 	},
 	"api-keys": {
-		"youtube": "xyz",
+		"google": "xyz",
+		"cse": {
+			"taekim": "abc"
+		},
 		"mongodb": "",
 		"discordme": {
 			"bump_id": "<id from /server/bump url>",
