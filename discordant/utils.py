@@ -188,8 +188,7 @@ def datetime_floor_microseconds(dt, digits=3):
 
 def geq_role(self, user, author):
     self_user = self.default_server.get_member(self.user.id)
-    return user.top_role.position >= min(
-        self_user.top_role.position, author.top_role.position)
+    return user.top_role >= min(self_user.top_role, author.top_role)
 
 
 def gt_role(self, author, user, include_self=False):
@@ -212,5 +211,5 @@ def len_args(s, n, *args):
     return len(split) == n, split
 
 
-def has_permission(user, perm):
-    return getattr(user.server.default_channel.permissions_for(user), perm)
+def has_permission(member, perm):
+    return getattr(member.server_permissions, perm)

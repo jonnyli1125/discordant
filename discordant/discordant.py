@@ -121,7 +121,7 @@ class Discordant(discord.Client):
         self.testing_channel = self.get_channel(
             self.config["client"]["testing_channel"])
         self.default_server = self.log_channel.server
-        await self.change_status(
+        await self.change_presence(
             game=discord.Game(name=self.config["client"]["game"])
             if self.config["client"]["game"] else None)
 
