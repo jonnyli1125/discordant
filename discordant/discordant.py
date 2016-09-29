@@ -209,7 +209,10 @@ class Discordant(discord.Client):
                 print('Handler for command "{}" must be a coroutine'.format(
                     name))
                 sys.exit(-1)
-
+            if not func.__doc__:
+                print('Missing documentation in command "{}"'.format(
+                    name))
+                sys.exit(-1)
             func_name = '_cmd_' + func.__name__
             while func_name in cls._commands:
                 func_name += '_'

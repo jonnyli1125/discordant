@@ -418,7 +418,7 @@ def _search_args_context(args):
 @Discordant.register_command("yourei", arg_func=_search_args_context)
 async def _yourei_search(self, args_tuple, message):
     """!yourei [limit] <query> [context=bool]
-    Searches Japanese example sentences from <http://yourei.jp>."""
+    searches japanese example sentences from <http://yourei.jp>."""
     await _example_sentence_search(
         self, args_tuple, message, "yourei", "http://yourei.jp/")
 
@@ -680,5 +680,5 @@ async def _google_search(self, args_tuple, message, cse_key):
 @Discordant.register_command("taekim", ["tk"], arg_func=_search_args)
 async def _taekim_search(self, args_tuple, message):
     """!taekim [limit] <query>
-    Searches Tae Kim's Guide to Japanese - http://guidetojapanese.org/"""
+    searches <http://guidetojapanese.org/>"""
     await _google_search(self, args_tuple, message, "taekim")
