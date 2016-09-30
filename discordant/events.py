@@ -162,7 +162,9 @@ async def stats_update(self):
     channels = []
     for channel in server.channels:
         if channel in [self.staff_channel, self.testing_channel] \
-                or channel.type != discord.ChannelType.text:
+                or channel.type != discord.ChannelType.text \
+                or not channel.permissions_for(server.get_member(
+                    self.user.id)).read_messages:
             continue
         channels.append({"channel_id": channel.id, "name": channel.name})
         search = await self.mongodb.logs.find({
@@ -178,7 +180,6 @@ async def stats_update(self):
                 pass
         limit, after = (sys.maxsize, last_msg) if last_msg else (100, None)
         async for message in self.logs_from(channel, limit, after=after):
-            author = message.author
             logs.append({
                 "message_id": message.id,
                 "author_id": message.author.id,

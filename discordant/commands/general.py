@@ -84,8 +84,16 @@ def _help_menu(sections):
     return output
 
 
-@Discordant.register_command("timezone", ["tz"], arg_func=utils.has_args)
-async def _convert_timezone(self, args, message):
+def _tz_args(args):
+    if not args:
+        return False
+    split = args.split()
+    len_s = len(split)
+    return len_s == 1 or len_s >= 3, split
+
+
+@Discordant.register_command("timezone", ["tz"], arg_func=_tz_args)
+async def _convert_timezone(self, args_split, message):
     """!timezone <time> <from> <\*to> or !timezone <\*timezone>
     displays time in given timezone(s)."""
     def get_timezone_by_code(code):
@@ -128,23 +136,23 @@ async def _convert_timezone(self, args, message):
         return new_dt.strftime("%I:%M %p %Z") + (
             ", " + relative_date_str(dt, new_dt) if relative else "")
 
-    split = args.split()
     try:
-        is_t = is_time(split[0])
+        is_t = is_time(args_split[0])
         if is_t:
-            dt = get_timezone_by_code(split[1]).localize(read_time(split[0]))
-            tz_strs = split[2:]
+            dt = get_timezone_by_code(args_split[1]).localize(read_time(
+                args_split[0]))
+            tz_strs = args_split[2:]
             output = "{} is{}".format(
                 dt.strftime("%I:%M %p %Z"),
                 ":\n" if len(tz_strs) > 1 else " ")
         else:
             dt = pytz.utc.localize(datetime.utcnow())
-            tz_strs = split
+            tz_strs = args_split
             output = "It is currently" + (":\n" if len(tz_strs) > 1 else " ")
         output += "\n".join([dt_format(dt, tz_str, is_t) for tz_str in tz_strs])
         await self.send_message(message.channel, output)
     except ValueError:
-        await self.send_message(message.channel, split[0] +
+        await self.send_message(message.channel, args_split[0] +
                                 ": Not a valid time format or time zone code.")
 
 
@@ -510,7 +518,7 @@ async def _show_voice_channels_toggle(self, args, message, context):
         await _delete_after(self, 5, [message, msg])
 
 
-@Discordant.register_command("readingcircle", ["rc"], context=True)
+#@Discordant.register_command("readingcircle", ["rc"], context=True)
 async def _reading_circle(self, args, message, context):
     """!readingcircle <beginner/intermediate>
     add/remove yourself to ping notification lists for beginner or intermediate
@@ -545,11 +553,11 @@ async def _tag(self, args, message, context):
     split = args.split(None, 1)
     tag = split[0]
     content = split[1] if len(split) > 1 else None
-    query = {"tag": tag}
-    cursor = await collection.find(query).to_list(None)
+    query = {"tag": re.compile(tag, re.I)}
+    cursor = await collection.find_one(query)
 
     def has_permission(user):
-        return cursor[0]["owner"] == user.id or \
+        return cursor["owner"] == user.id or \
                context.server.default_channel.permissions_for(
                    user).manage_messages
 
@@ -578,7 +586,7 @@ async def _tag(self, args, message, context):
     else:
         await self.send_message(
             message.channel,
-            cursor[0]["content"] if cursor else "Tag could not be found")
+            cursor["content"] if cursor else "Tag could not be found")
 
 
 @Discordant.register_command("studying", context=True)

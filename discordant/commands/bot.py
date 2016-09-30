@@ -43,7 +43,7 @@ async def _client_settings(self, args, message):
 
 
 @Discordant.register_command("say", context=True, perm_func=utils.is_controller,
-                             arg_func=lambda a: utils.len_args(a, 2, None, 1))
+                             arg_func=lambda a: utils.len_split(a, 2, None, 1))
 async def _say(self, args_split, message, context):
     """!say <channel> <message>
     sends a message to a channel through the bot."""
@@ -58,7 +58,7 @@ async def _say(self, args_split, message, context):
 
 @Discordant.register_command("edit", context=True,
                              perm_func=utils.is_controller,
-                             arg_func=lambda a: utils.len_args(a, 3, None, 2))
+                             arg_func=lambda a: utils.len_split(a, 3, None, 2))
 async def _edit(self, args_split, message, context):
     """!edit <channel> <message id> <message>
     edits a message with that id in the given channel to a new message."""
@@ -142,7 +142,7 @@ async def _eval(self, args, message, context):
 
 @Discordant.register_command("usercmd", ["ucmd"], context=True,
                              perm_func=utils.is_controller,
-                             arg_func=lambda a: utils.len_args(a, 2, None, 1))
+                             arg_func=lambda a: utils.len_split(a, 2, None, 1))
 async def _usercmd(self, args_split, message, context):
     """!usercmd <user> <command>
     executes a command as another user."""

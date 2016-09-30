@@ -206,7 +206,7 @@ def has_args(s):
     return bool(s)
 
 
-def len_args(s, n, *args):
+def len_split(s, n, *args):
     split = s.split(*args)
     return len(split) == n, split
 
