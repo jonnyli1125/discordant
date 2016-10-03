@@ -306,8 +306,8 @@ def _jisho_kanji_info(tree):
     return "**{}** {}\n*{}. {}*\n{}\n{}\n{}".format(
         character, meanings, strokes, stats, readings, radical, parts)
 
-async def _jisho_sentences(self, limit, query, message):
-    url = "http://jisho.org/search/" + urllib.parse.quote(
+async def _jisho_sentences(self, limit, query, message, sentence_url=None):
+    url = sentence_url or "http://jisho.org/search/" + urllib.parse.quote(
         query, encoding="utf-8")
     try:
         with aiohttp.ClientSession() as session:
@@ -317,7 +317,8 @@ async def _jisho_sentences(self, limit, query, message):
         await self.send_message(message.channel, "Request failed: " + str(e))
         return
     tree = html.fromstring(data)
-    sentences = tree.xpath('//ul[@class="sentences"]')
+    sentences = tree.xpath('//ul[@class="sentences"]') or tree.xpath(
+        '//article[@class="sentences columns small-8"]')
     if not sentences:
         await self.send_message(message.channel, "No results found.")
         return
@@ -419,13 +420,18 @@ async def _alc_search(self, args_tuple, message):
 
 
 async def _dict_search_link(self, match, message, cmd, group):
-    await getattr(self, utils.get_cmd(self, cmd).name)(
-        urllib.parse.unquote(match.group(group), encoding="utf-8"), message)
+    query = urllib.parse.unquote(match.group(group), encoding="utf-8")
+    args_tuple = (1, query) + (([],) if cmd in ("yourei", "nyanglish") else ())
+    await getattr(self, utils.get_cmd(self, cmd).name)(args_tuple, message)
 
 
-@Discordant.register_handler(r"http:\/\/jisho\.org\/(search|word)\/(\S*)")
+@Discordant.register_handler(
+    r"http:\/\/jisho\.org\/(search|word|sentences)\/(\S*)")
 async def _jisho_link(self, match, message):
-    await _dict_search_link(self, match, message, "jisho", 2)
+    if match.group(1) == "sentences":
+        await _jisho_sentences(self, 1, "", message, match.group(0))
+    else:
+        await _dict_search_link(self, match, message, "jisho", 2)
 
 
 @Discordant.register_handler(r"http:\/\/eow\.alc\.co\.jp\/search\?q=([^\s&]*)")

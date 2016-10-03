@@ -134,9 +134,11 @@ class Discordant(discord.Client):
 
         for handler_name, trigger in self._handlers.items():
             match = trigger.search(message.content)
-            if match is not None:
+            if match:
                 await getattr(self, handler_name)(match, message)
-            # do we return after the first match? or allow multiple matches
+            # for match in trigger.finditer(message.content):
+            #     await getattr(self, handler_name)(match, message)
+            # the spam potential of this is too high...
 
     async def run_command(self, message):
         split = message.content.split(None, 1)
