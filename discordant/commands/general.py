@@ -175,10 +175,17 @@ def _search_args(args, keys=None):
 @Discordant.register_command("jisho", ["j"], arg_func=_search_args)
 async def _jisho_search(self, args_tuple, message):
     """!jisho [limit] <query>
-    searches japanese-english dictionary <http://jisho.org>."""
+    searches japanese-english dictionary <http://jisho.org>.
+    see <http://jisho.org/docs> for search options."""
     limit, query = args_tuple
     if "#kanji" in query:
         await _jisho_kanji(self, limit, query, message)
+        return
+    if "#sentences" in query:
+        await _jisho_sentences(self, limit, query, message)
+        return
+    if "#names" in query:
+        await _jisho_names(self, limit, query, message)
         return
     url = "http://jisho.org/api/v1/search/words?keyword=" + \
           urllib.parse.quote(query, encoding="utf-8")
@@ -272,35 +279,86 @@ async def _jisho_kanji(self, limit, query, message):
             output += "Request failed: {}, {}".format(k_url, e) + "\n"
             continue
         output += _jisho_kanji_info(html.fromstring(k_data)) + "\n"
-    await self.send_message(message.channel, output.strip())
+    await utils.send_long_message(
+        self, message.channel, output, message.server is not None)
 
 
 def _jisho_kanji_info(tree):
     details = tree.xpath('//div[@class="kanji details"]')[0]
-
-    def remove_spaces(s, all=False):
-        return re.sub(r"\s?", "", s) if all else re.sub(r"\s+", " ", s).strip()
-
-    character = remove_spaces(
+    character = utils.remove_spaces(
         details.xpath('//h1[@class="character"]')[0].text_content())
-    meanings = remove_spaces(details.xpath(
+    meanings = utils.remove_spaces(details.xpath(
         '//div[@class="kanji-details__main-meanings"]')[0].text_content())
-    strokes = remove_spaces(details.xpath(
+    strokes = utils.remove_spaces(details.xpath(
         '//div[@class="kanji-details__stroke_count"]')[0].text_content())
     stats_div = details.xpath('//div[@class="kanji_stats"]')[0]
-    stats = " ".join([remove_spaces(x.text_content()) + "."
+    stats = " ".join([utils.remove_spaces(x.text_content()) + "."
                       for x in stats_div.xpath('./div')])
     readings_div = details.xpath(
         '//div[@class="kanji-details__main-readings"]')[0]
-    readings = "\n".join([remove_spaces(x.text_content()).replace("、", ",")
-                          for x in readings_div])
+    readings = "\n".join([utils.remove_spaces(x.text_content()).replace(
+        "、", ",") for x in readings_div])
     radicals_divs = [x[0] for x in details.xpath('//div[@class="radicals"]')]
-    radical = remove_spaces(radicals_divs[0].text_content())
+    radical = utils.remove_spaces(radicals_divs[0].text_content())
     parts_div = radicals_divs[1]
     parts = "Parts: " + ", ".join(
-        remove_spaces(parts_div.xpath("./dd")[0].text_content(), True))
+        utils.remove_spaces(parts_div.xpath("./dd")[0].text_content(), True))
     return "**{}** {}\n*{}. {}*\n{}\n{}\n{}".format(
         character, meanings, strokes, stats, readings, radical, parts)
+
+async def _jisho_sentences(self, limit, query, message):
+    url = "http://jisho.org/search/" + urllib.parse.quote(
+        query, encoding="utf-8")
+    try:
+        with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                data = await response.text()
+    except Exception as e:
+        await self.send_message(message.channel, "Request failed: " + str(e))
+        return
+    tree = html.fromstring(data)
+    sentences = tree.xpath('//ul[@class="sentences"]')
+    if not sentences:
+        await self.send_message(message.channel, "No results found.")
+        return
+    sentences = sentences[0][:limit]
+    fmt = ("**{i}.** " if len(sentences) > 1 else "") + "{jp}。{en}\n"
+    output = ""
+    for i, li in enumerate(sentences):
+        div = li.xpath('div[@class="sentence_content"]')[0]
+        japanese = "".join(div.xpath('ul/li/span[@class="unlinked"]/text()'))
+        english = div[1][0].text_content()
+        output += fmt.format(jp=japanese, en=english, i=i+1)
+    await utils.send_long_message(
+        self, message.channel, output, message.server is not None)
+
+
+async def _jisho_names(self, limit, query, message):
+    url = "http://jisho.org/search/" + urllib.parse.quote(
+        query, encoding="utf-8")
+    try:
+        with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                data = await response.text()
+    except Exception as e:
+        await self.send_message(message.channel, "Request failed: " + str(e))
+        return
+    tree = html.fromstring(data)
+    names = tree.xpath('//div[@class="names"]')
+    if not names:
+        await self.send_message(message.channel, "No results found.")
+        return
+    names = names[0].xpath("div")[:limit]
+    output = ""
+    for div in names:
+        name_split = div[0].text_content().split()
+        name = "**{}** {}".format(name_split[1][1:-1], name_split[0])
+        info_div = div[1][0]
+        tags = utils.remove_spaces(info_div[0].text_content())
+        meaning = utils.remove_spaces(info_div[1].text_content())
+        output += "{}\n*{}.*\n{}\n".format(name, tags, meaning)
+    await utils.send_long_message(
+        self, message.channel, output, message.server is not None)
 
 
 @Discordant.register_command("alc", arg_func=_search_args)
@@ -681,12 +739,12 @@ async def _google_search(self, args_tuple, message, cse_key):
     items = data["items"][:limit]
     fmt = "**{index}.** {title} - <{link}>" \
         if len(items) > 1 else "{title} - {link}"
-    results = [fmt.format(**x, index=i) for i, x in enumerate(items)]
+    results = [fmt.format(**x, index=i+1) for i, x in enumerate(items)]
     await self.send_message(message.channel, "\n".join(results))
 
 
 @Discordant.register_command("taekim", ["tk"], arg_func=_search_args)
 async def _taekim_search(self, args_tuple, message):
     """!taekim [limit] <query>
-    searches <http://guidetojapanese.org/>"""
+    searches <http://guidetojapanese.org>."""
     await _google_search(self, args_tuple, message, "taekim")

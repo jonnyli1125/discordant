@@ -213,3 +213,7 @@ def len_split(s, n, *args):
 
 def has_permission(member, perm):
     return getattr(member.server_permissions, perm)
+
+
+def remove_spaces(s, all=False):
+    return re.sub(r"\s?", "", s) if all else re.sub(r"\s+", " ", s).strip()
