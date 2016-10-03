@@ -353,7 +353,8 @@ async def _jisho_names(self, limit, query, message):
     output = ""
     for div in names:
         name_split = div[0].text_content().split()
-        name = "**{}** {}".format(name_split[1][1:-1], name_split[0])
+        name = "**{}** {}".format(name_split[1][1:-1], name_split[0]) \
+            if len(name_split) > 1 else "**{}**".format(name_split[0])
         info_div = div[1][0]
         tags = utils.remove_spaces(info_div[0].text_content())
         meaning = utils.remove_spaces(info_div[1].text_content())
