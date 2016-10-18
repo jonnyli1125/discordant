@@ -15,7 +15,7 @@ def is_url(s):  # good enough for now lmao
 
 
 def long_message(output, truncate=False, max_lines=15):
-    output = output.strip()
+    output = output.rstrip()
     return ["\n".join(output.split("\n")[:max_lines]) +
             "\n... *Message truncated. " +
             "Send me a command over PM to show more!*"] \
