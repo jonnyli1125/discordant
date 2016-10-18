@@ -29,48 +29,47 @@ async def _help(self, args, message, context):
             sections[cmd.section].append(cmd)
         else:
             sections[cmd.section] = [cmd]
+    cmd = utils.get_cmd(self, args) if args else None
+    if cmd:
+        if cmd.perm_func and not cmd.perm_func(self, context.author):
+            await self.send_message(
+                message.channel, "You are not authorized to use this command.")
+            return
+        await self.send_message(message.channel, cmd.help)
+        return
     if args:
-        cmd = utils.get_cmd(self, args)
-        if cmd:
-            if cmd.perm_func and not cmd.perm_func(self, context.author):
-                await self.send_message(
-                    message.channel,
-                    "You are not authorized to use this command.")
-                return
-            await self.send_message(message.channel, cmd.help)
-        elif args in sections:
-            await utils.send_long_message(self, message.channel, _help_menu(
-                {args: sections[args]}))
+        if args in sections:
+            sections = {args: sections[args]}
         else:
-            await self.send_message(
-                message.channel, "Command could not be found.")
-    else:
-        msg = None
-        try:
-            await utils.send_long_message(self, message.author, _help_menu(
-                sections))
-            await self.send_message(
-                message.author,
-                "**command help syntax**:\n"
-                "  [] - optional argument\n"
-                "  <> - required argument\n"
-                "  \\* - any number of arguments\n"
-                "  key=value - kwargs style argument (each key-value pair is "
-                "separated by space, and the key and value are separated by the"
-                " \"=\" character).\n"
-                "  \\*\\* - any number of kwargs")
-            await self.send_message(
-                message.author,
-                "Type !help [command/section] to display more information "
-                "about a certain command or section.")
-        except discord.errors.Forbidden:
+            await self.send_message(message.channel,
+                                    "Command could not be found.")
+            return
+    msg = None
+    try:
+        await utils.send_long_message(self, message.author, _help_menu(
+            sections))
+        await self.send_message(
+            message.author,
+            "type !help [command/section] to display more information "
+            "about a certain command or section.")
+        await self.send_message(
+            message.author,
+            "**command help syntax**:\n"
+            "[]     optional argument\n"
+            "<>    required argument\n"
+            "\\*       any number of arguments\n"
+            "k=v  kwargs style argument (each key-value pair is "
+            "separated by space, and the key and value are separated by the"
+            " \"=\" character).\n"
+            "\\*\\*     any number of kwargs")
+    except discord.errors.Forbidden:
+        msg = await self.send_message(
+            message.channel, "Please enable your PMs.")
+    if message.server:
+        if not msg:
             msg = await self.send_message(
-                message.channel, "Please enable your PMs.")
-        if message.server:
-            if not msg:
-                msg = await self.send_message(
-                    message.channel, "Check your PMs.")
-            await _delete_after(self, 5, [message, msg])
+                message.channel, "Check your PMs.")
+        await _delete_after(self, 5, [message, msg])
 
 
 def _help_menu(sections):
