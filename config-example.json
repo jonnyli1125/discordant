@@ -13,7 +13,8 @@
 	"api-keys": {
 		"google": "xyz",
 		"cse": {
-			"taekim": "abc"
+			"taekim": "abc",
+			"google": "abc"
 		},
 		"mongodb": "",
 		"discordme": {

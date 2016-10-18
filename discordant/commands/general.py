@@ -754,3 +754,10 @@ async def _taekim_search(self, args_tuple, message):
     """!taekim [limit] <query>
     searches <http://guidetojapanese.org>."""
     await _google_search(self, args_tuple, message, "taekim")
+
+
+@Discordant.register_command("google", ["g"], arg_func=_search_args)
+async def _web_search(self, args_tuple, message):
+    """!google [limit] <query>
+    searches the web through google."""
+    await _google_search(self, args_tuple, message, "google")
