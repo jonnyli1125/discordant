@@ -76,7 +76,8 @@ async def load_punishment_timers(self):
 _discordme_bump = False
 
 
-@Discordant.register_event("ready")
+# discord.me added captcha so rip this
+# @Discordant.register_event("ready")
 async def discordme_bump(self):
     global _discordme_bump
     if not _discordme_bump:
