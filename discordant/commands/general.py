@@ -582,7 +582,7 @@ async def _show_voice_channels_toggle(self, args, message, context):
         await _delete_after(self, 5, [message, msg])
 
 
-#@Discordant.register_command("readingcircle", ["rc"], context=True)
+@Discordant.register_command("readingcircle", ["rc"], context=True)
 async def _reading_circle(self, args, message, context):
     """!readingcircle <beginner/intermediate>
     add/remove yourself to ping notification lists for beginner or intermediate
