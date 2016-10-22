@@ -25,7 +25,7 @@ def _punishment_format(self, server, document):
     return ("**{action}**\n" +
             "*date*: {date}\n" +
             "*user*: {user}\n" +
-            "*moderator*: {moderator}\n" +
+            "*mod*: {moderator}\n" +
             "*duration*: {duration}\n" +
             "*reason*: {reason}").format(
         **document)
