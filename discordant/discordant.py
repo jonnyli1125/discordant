@@ -50,6 +50,7 @@ class Discordant(discord.Client):
         self.default_server = None
         self.commands_parsed = 0
         self.log_channel = None
+        self.warning_log_channel = None
         self.staff_channel = None
         self.testing_channel = None
 
@@ -116,6 +117,8 @@ class Discordant(discord.Client):
     async def on_ready(self):
         self.log_channel = self.get_channel(
             self.config["moderation"]["log_channel"])
+        self.warning_log_channel = self.get_channel(
+            self.config["moderation"]["warning_log_channel"])
         self.staff_channel = self.get_channel(
             self.config["moderation"]["staff_channel"])
         self.testing_channel = self.get_channel(

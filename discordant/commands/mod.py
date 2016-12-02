@@ -136,9 +136,11 @@ async def _mod_cmd(self, args, message, context):
         "reason": reason
     }
     await collection.insert(document)
-    await self.add_roles(user, role)
+    not_warn = action != "warning"
+    if not_warn:  # hide warning change
+        await self.add_roles(user, role)
     await self.send_message(
-        self.log_channel,
+        self.log_channel if not_warn else self.warning_log_channel,
         _punishment_format(self, message.server, document))
     await utils.add_punishment_timer(self, user, action)
 
@@ -188,9 +190,11 @@ async def _mod_remove_cmd(self, args, message, context):
         "reason": reason
     }
     await collection.insert(document)
-    await self.remove_roles(user, role)
+    not_warn = orig_action != "warning"
+    if not_warn:  # hide warning change
+        await self.remove_roles(user, role)
     await self.send_message(
-        self.log_channel,
+        self.log_channel if not_warn else self.warning_log_channel,
         _punishment_format(self, message.server, document))
 
 
