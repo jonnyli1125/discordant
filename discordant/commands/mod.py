@@ -1,5 +1,4 @@
 import re
-import shlex
 import sys
 from datetime import datetime
 
@@ -80,7 +79,7 @@ _mod_cmd_to_action = {"warn": "warning",
 async def _mod_cmd(self, args, message, context):
     keys = ["duration", "reason"]
     kwargs = utils.get_kwargs(args, keys)
-    split = shlex.split(args)
+    split = utils.try_shlex(args)
     if not kwargs and len(split) > 1:
         # has more than one pos arg, no kwargs
         args = split[0] + ' reason="' + " ".join(split[1:]) + '"'
@@ -162,7 +161,7 @@ async def _mute(self, args, message, context):
 
 
 async def _mod_remove_cmd(self, args, message, context):
-    split = shlex.split(args)
+    split = utils.try_shlex(args)
     user_search = split[0]
     reason = " ".join(split[1:]) if len(split) > 1 else "No reason given."
     user = utils.get_user(user_search, context.server.members, message)
@@ -219,7 +218,7 @@ async def _unmute(self, args, message, context):
 async def _ban(self, args, message, context):
     """!ban <user/user id> [reason]
     bans a user."""
-    split = shlex.split(args)
+    split = utils.try_shlex(args)
     user_search = split[0]
     reason = " ".join(split[1:]) if len(split) > 1 else "No reason given."
     user = utils.get_user(user_search, context.server.members, message, True)
@@ -311,7 +310,7 @@ async def _bans(self, args, message, context):
 async def _reason(self, args, message, context):
     """!reason <user> <reason>
     edits the reason of the given user's most recent punishment."""
-    split = shlex.split(args)
+    split = utils.try_shlex(args)
     if len(split) < 2:
         await self.send_message(message.channel, context.cmd.help)
         return

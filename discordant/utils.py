@@ -30,14 +30,14 @@ async def send_long_message(self, channel, message, truncate=False,
 
 def get_kwargs(args_str, keys=None):
     return dict(
-        x.split("=") for x in shlex.split(args_str)
+        x.split("=") for x in try_shlex(args_str)
         if "=" in x and
         (True if keys is None else x.split("=")[0] in keys))
 
 
 def strip_kwargs(args_str, keys=None):
     return " ".join(
-        [x for x in shlex.split(args_str)
+        [x for x in try_shlex(args_str)
          if not ("=" in x and
          (True if keys is None else x.split("=")[0] in keys))])
 
@@ -217,3 +217,11 @@ def has_permission(member, perm):
 
 def remove_spaces(s, all=False):
     return re.sub(r"\s?", "", s) if all else re.sub(r"\s+", " ", s).strip()
+
+
+def try_shlex(s):
+    try:
+        split = shlex.split(s)
+    except ValueError:
+        split = s.split()
+    return split
