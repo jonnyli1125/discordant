@@ -131,7 +131,8 @@ async def add_punishment_timer(self, member, action):
         punished = await is_punished(self, member, action)
         if not punished:
             print("Removing punishment for " + str(member))
-            await self.remove_roles(member, role)
+            if role:
+                await self.remove_roles(member, role)
             break
         await asyncio.sleep(
             self.config["moderation"]["punishment_check_rate"])
@@ -139,12 +140,13 @@ async def add_punishment_timer(self, member, action):
 
 def action_to_role(self, action):
     dct = {
-        "warning": "Warned",
+        # "warning": "Warned",
         "mute": "Muted"
     }
     if action not in dct:
-        raise ValueError("Invalid action {}, must be one of: {}".format(
-            action, ", ".join(dct.keys())))
+        return None
+        # raise ValueError("Invalid action {}, must be one of: {}".format(
+        #     action, ", ".join(dct.keys())))
     return discord.utils.get(self.default_server.roles, name=dct[action])
 
 

@@ -103,7 +103,6 @@ async def _mod_cmd(self, args, message, context):
         return
     reason = utils.get_from_kwargs("reason", kwargs, "No reason given.")
     action = _mod_cmd_to_action[context.cmd_name]
-    role = utils.action_to_role(self, action)
     collection = self.mongodb.punishments
     if await utils.is_punished(self, user, action):
         await self.send_message(
@@ -135,8 +134,9 @@ async def _mod_cmd(self, args, message, context):
         "reason": reason
     }
     await collection.insert(document)
+    role = utils.action_to_role(self, action)
     not_warn = action != "warning"
-    if not_warn:  # hide warning change
+    if role and not_warn:  # hide warning change
         await self.add_roles(user, role)
     await self.send_message(
         self.log_channel if not_warn else self.warning_log_channel,
@@ -175,7 +175,6 @@ async def _mod_remove_cmd(self, args, message, context):
     collection = self.mongodb.punishments
     action = _mod_cmd_to_action[context.cmd_name]
     orig_action = action.replace("remove ", "")
-    role = utils.action_to_role(self, orig_action)
     if not await utils.is_punished(self, user, orig_action):
         await self.send_message(
             message.channel, user.name + " has no active " + orig_action + ".")
@@ -189,8 +188,9 @@ async def _mod_remove_cmd(self, args, message, context):
         "reason": reason
     }
     await collection.insert(document)
+    role = utils.action_to_role(self, orig_action)
     not_warn = orig_action != "warning"
-    if not_warn:  # hide warning change
+    if role and not_warn:  # hide warning change
         await self.remove_roles(user, role)
     await self.send_message(
         self.log_channel if not_warn else self.warning_log_channel,
@@ -338,8 +338,15 @@ async def _reason(self, args, message, context):
         return
     doc["reason"] = reason
     await collection.save(doc)
-    async for msg in self.logs_from(self.log_channel, limit=sys.maxsize):
-        if "\n*user*: {}\n".format(user) in msg.content:
-            await self.edit_message(
-                msg, re.sub(r"(\*reason\*: ).*", "\g<1>" + reason, msg.content))
-            return
+
+    async def edit_message(channel):
+        async for msg in self.logs_from(channel, limit=sys.maxsize):
+            if "\n*user*: {}\n".format(user) in msg.content:
+                await self.edit_message(
+                    msg,
+                    re.sub(r"(\*reason\*: ).*", "\g<1>" + reason, msg.content))
+                return True
+        return False
+
+    if not await edit_message(self.log_channel):
+        await edit_message(self.warning_log_channel)

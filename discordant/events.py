@@ -59,7 +59,7 @@ async def load_punishment_timers(self):
         if await utils.is_punished(self, member, action):
             print("Adding punishment timer for " + str(member))
             timers.append(utils.add_punishment_timer(self, member, action))
-        elif role in member.roles:
+        elif role and role in member.roles:
             if member.id not in to_remove:
                 to_remove[member.id] = []
             to_remove[member.id].append(role)
@@ -131,9 +131,11 @@ async def on_member_join(self, member):
             to_add = []
             timers = []
             for action in punishments:
-                to_add.append(utils.action_to_role(self, action))
-                timers.append(utils.add_punishment_timer(
-                    self, member, action))
+                role = utils.action_to_role(self, action)
+                if role:
+                    to_add.append(role)
+                    timers.append(utils.add_punishment_timer(
+                        self, member, action))
             if to_add:
                 await asyncio.gather(self.add_roles(member, *to_add),
                                      *timers)
