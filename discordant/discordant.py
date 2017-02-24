@@ -170,6 +170,12 @@ class Discordant(discord.Client):
                     await self.send_message(message.channel, cmd.help)
                     return
             await getattr(self, cmd.name)(*params)
+        else:
+            msg = await self.send_message(
+                message.channel,
+                "Command not found. Type !help to see all commands.")
+            await asyncio.sleep(5)
+            await self.delete_message(msg)
 
     @classmethod
     def register_handler(cls, trigger, regex_flags=0):

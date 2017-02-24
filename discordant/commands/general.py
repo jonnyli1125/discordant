@@ -582,7 +582,7 @@ async def _show_voice_channels_toggle(self, args, message, context):
         await _delete_after(self, 5, [message, msg])
 
 
-@Discordant.register_command("readingcircle", ["rc"], context=True)
+# @Discordant.register_command("readingcircle", ["rc"], context=True)
 async def _reading_circle(self, args, message, context):
     """!readingcircle <beginner/intermediate>
     add/remove yourself to ping notification lists for beginner or intermediate
@@ -603,7 +603,7 @@ async def _reading_circle(self, args, message, context):
         await _delete_after(self, 5, [message, msg])
 
 
-@Discordant.register_command("tag", ["t"], context=True)
+@Discordant.register_command("tag", ["t", "tags"], context=True)
 async def _tag(self, args, message, context):
     """!tag <tag> [content/delete]
     display, add, edit, or delete tags (text stored in the bot's database)."""
@@ -656,7 +656,7 @@ async def _tag(self, args, message, context):
 @Discordant.register_command("studying", context=True)
 async def _studying(self, args, message, context):
     """!studying <resource>
-    add/remove a studying resource tag to yourself."""
+    add/remove a studying resource role to yourself."""
     collection = self.mongodb.studying_resources
     obj = await collection.find_one()
     if obj:

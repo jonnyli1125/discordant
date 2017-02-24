@@ -103,7 +103,7 @@ async def _stats(self, args, message):
             process.memory_info().rss / float(2 ** 20)))
 
 
-@Discordant.register_command("userinfo", ["uinfo", "u"], context=True,
+@Discordant.register_command("userinfo", ["uinfo", "u", "ui"], context=True,
                              arg_func=utils.has_args)
 async def _userinfo(self, args, message, context):
     """!userinfo <user>
