@@ -217,7 +217,7 @@ async def _jisho_search(self, args_tuple, message):
                 [tag[8:] for tag in result["tags"]]) + ". "
         if new_line:
             output += new_line + "\n"
-        senses = result["senses"]
+        senses = [x for x in result["senses"] if "english_definitions" in x]
         for index, sense in enumerate(senses):
             # jisho returns null sometimes for some parts of speech... k den
             parts = [x for x in sense["parts_of_speech"] if x is not None]
