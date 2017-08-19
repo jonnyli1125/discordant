@@ -171,13 +171,14 @@ def _search_args(args, keys=None):
     return True, args_tuple
 
 
-@Discordant.register_command("jisho", ["j"], arg_func=_search_args)
-async def _jisho_search(self, args_tuple, message):
+@Discordant.register_command("jisho", ["j", "kanji", "k"],
+                             arg_func=_search_args, context=True)
+async def _jisho_search(self, args_tuple, message, context):
     """!jisho [limit] <query>
     searches japanese-english dictionary <http://jisho.org>.
     see <http://jisho.org/docs> for search options."""
     limit, query = args_tuple
-    if "#kanji" in query:
+    if "#kanji" in query or context.cmd_name[0] == "k":
         await _jisho_kanji(self, limit, query, message)
         return
     if "#sentences" in query:
@@ -199,50 +200,59 @@ async def _jisho_search(self, args_tuple, message):
     if not results:
         await self.send_message(message.channel, "No results found.")
         return
-    output = ""
 
     def display_word(obj, *formats):
         f = formats[len(obj) - 1]
         return f.format(*obj.values()) if len(obj) == 1 else f.format(**obj)
 
+    embed = discord.Embed(
+        colour=self.default_server.get_member(self.user.id).colour,
+        url="http://jisho.org/search/" + query)
+
     for result in results:
-        japanese = result["japanese"]
-        output += display_word(japanese[0], "**{}**",
-                               "**{word}** {reading}") + "\n"
-        new_line = ""
+        jp = result["japanese"]
+        embed.title = display_word(jp[0], "{}", "{word}")
+        embed.description = display_word(
+            jp[0], "**{}**", "**{word}** {reading}") + "\n"
         if "is_common" in result and result["is_common"]:
-            new_line += "Common word. "
+            embed.description += "Common word. "
         if result["tags"]:  # it doesn't show jlpt tags, only wk tags?
-            new_line += "Wanikani level " + ", ".join(
+            embed.description += "Wanikani level " + ", ".join(
                 [tag[8:] for tag in result["tags"]]) + ". "
-        if new_line:
-            output += new_line + "\n"
         senses = [x for x in result["senses"] if "english_definitions" in x]
+        defns = ""
         for index, sense in enumerate(senses):
             # jisho returns null sometimes for some parts of speech... k den
             parts = [x for x in sense["parts_of_speech"] if x is not None]
             if parts == ["Wikipedia definition"] and len(senses) > 1:
                 continue
             if parts:
-                output += "*" + ", ".join(parts) + "*\n"
-            output += str(index + 1) + ". " + "; ".join(
+                embed.description += "\n*" + ", ".join(parts) + "*"
+            defns += str(index + 1) + ". " + "; ".join(
                 sense["english_definitions"])
             for attr in ["tags", "info"]:
                 sense_attr = [x for x in sense[attr] if x]
                 if sense_attr:
-                    output += ". *" + "*. *".join(sense_attr) + "*"
+                    defns += ". *" + "*. *".join(sense_attr) + "*"
             if sense["see_also"]:
-                output += ". *See also*: " + ", ".join(sense["see_also"])
-            output += "\n"
-            output += "\n".join(
+                defns += ". *See also*: " + ", ".join(
+                    ["[{0}](http://jisho.org/search/{0})".format(x)
+                     for x in sense["see_also"]])
+            defns += "\n"
+            defns += "\n".join(
                 ["{text}: {url}".format(**x) for x in sense["links"]])
-        if len(japanese) > 1:
-            output += "Other forms: " + ", ".join(
+        if len(defns) > 1024:
+            err = "... *Message truncated. Please access directly on jisho.*"
+            defns = defns[:1024 - len(err)]
+            defns = defns[:defns.rindex("\n") + 1] + err
+        embed.add_field(name="Definitions:", value=defns)
+        if len(jp) > 1:
+            embed.add_field(name="Other forms:", value=", ".join(
                 [display_word(x, "{}", "{word} ({reading})") for x in
-                 japanese[1:]]) + "\n"
-        # output += "\n"
-    await utils.send_long_message(
-        self, message.channel, output, message.server is not None)
+                 jp[1:]]) + "\n")
+    await self.send_message(message.channel, embed=embed)
+    # await utils.send_long_message(
+    #     self, message.channel, output, message.server is not None)
 
 
 async def _jisho_kanji(self, limit, query, message):
@@ -425,8 +435,8 @@ async def _dict_search_link(self, match, message, cmd, group):
     await getattr(self, utils.get_cmd(self, cmd).name)(args_tuple, message)
 
 
-@Discordant.register_handler(
-    r"http:\/\/jisho\.org\/(search|word|sentences)\/(\S*)")
+# @Discordant.register_handler(
+#     r"http:\/\/jisho\.org\/(search|word|sentences)\/(\S*)")
 async def _jisho_link(self, match, message):
     if match.group(1) == "sentences":
         await _jisho_sentences(self, 1, "", message, match.group(0))
@@ -434,7 +444,7 @@ async def _jisho_link(self, match, message):
         await _dict_search_link(self, match, message, "jisho", 2)
 
 
-@Discordant.register_handler(r"http:\/\/eow\.alc\.co\.jp\/search\?q=([^\s&]*)")
+# @Discordant.register_handler(r"http:\/\/eow\.alc\.co\.jp\/search\?q=([^\s&]*)")
 async def _alc_link(self, match, message):
     await _dict_search_link(self, match, message, "alc", 1)
 
@@ -503,7 +513,7 @@ async def _nyanglish_search(self, args_tuple, message):
         self, args_tuple, message, "nyanglish", "http://nyanglish.com/")
 
 
-@Discordant.register_handler(r"http:\/\/(yourei\.jp|nyanglish\.com)\/(\S+)")
+# @Discordant.register_handler(r"http:\/\/(yourei\.jp|nyanglish\.com)\/(\S+)")
 async def _yourei_link(self, match, message):
     await _dict_search_link(
         self, match, message, match.group(1).split(".")[0], 2)
