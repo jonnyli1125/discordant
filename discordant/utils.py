@@ -14,13 +14,15 @@ def is_url(s):  # good enough for now lmao
     return bool(re.match(r'^https?:\/\/.*', s))
 
 
-def long_message(output, truncate=False, max_lines=15):
-    output = output.rstrip()
-    return ["\n".join(output.split("\n")[:max_lines]) +
-            "\n... *Message truncated. " +
-            "Send me a command over PM to show more!*"] \
-        if truncate and output.count("\n") > max_lines \
-        else split_every(output, 2000)
+def long_message(output, truncate=False, max_chars=2000,
+                 err_msg="... *Message truncated. PM me to show more!"):
+    if not truncate:
+        return split_every(output, max_chars)
+    elif len(output) > max_chars:
+        output = output[:max_chars - len(err_msg)]
+        return output[:output.rindex("\n") + 1] + err_msg
+    else:
+        return output
 
 async def send_long_message(self, channel, message, truncate=False,
                             max_lines=15):

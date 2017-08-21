@@ -178,7 +178,9 @@ async def _jisho_search(self, args_tuple, message, context):
     searches japanese-english dictionary <http://jisho.org>.
     see <http://jisho.org/docs> for search options."""
     limit, query = args_tuple
-    if "#kanji" in query or context.cmd_name[0] == "k":
+    if context.cmd_name[0] == "k":
+        query += "#kanji"
+    if "#kanji" in query:
         await _jisho_kanji(self, limit, query, message)
         return
     if "#sentences" in query:
@@ -241,11 +243,13 @@ async def _jisho_search(self, args_tuple, message, context):
             defns += "\n"
             defns += "\n".join(
                 ["{text}: {url}".format(**x) for x in sense["links"]])
-        if len(defns) > 1024:
-            err = "... *Message truncated. Please access directly on jisho.*"
-            defns = defns[:1024 - len(err)]
-            defns = defns[:defns.rindex("\n") + 1] + err
-        embed.add_field(name="Definitions:", value=defns)
+        embed.add_field(
+            name="Definitions:",
+            value=utils.long_message(
+                defns, truncate=True,
+                err_msg="... *Message truncated. " +
+                        "Please access directly on jisho.*",
+                max_chars=1024))
         if len(jp) > 1:
             embed.add_field(name="Other forms:", value=", ".join(
                 [display_word(x, "{}", "{word} ({reading})") for x in
@@ -268,7 +272,8 @@ async def _jisho_kanji(self, limit, query, message):
     tree = html.fromstring(data)
     info_div = tree.xpath('//div[@class="kanji details"]')
     if info_div:
-        await self.send_message(message.channel, _jisho_kanji_info(tree))
+        await self.send_message(
+            message.channel, embed=_jisho_kanji_info(self, tree))
         return
     results_div = tree.xpath('//div[@class="kanji_light_block"]')
     if not results_div:
@@ -276,7 +281,6 @@ async def _jisho_kanji(self, limit, query, message):
         return
     results_divs = results_div[0].xpath(
         './div[@class="entry kanji_light clearfix"]')[:limit]
-    output = ""
     for result_div in results_divs:
         k_url = result_div.xpath(
             'a[@class="light-details_link"]')[0].attrib["href"]
@@ -285,14 +289,17 @@ async def _jisho_kanji(self, limit, query, message):
                 async with session.get(k_url) as response:
                     k_data = await response.text()
         except Exception as e:
-            output += "Request failed: {}, {}".format(k_url, e) + "\n"
+            await self.send_message(
+                message.channel, "Request failed: {}, {}".format(k_url, e))
             continue
-        output += _jisho_kanji_info(html.fromstring(k_data)) + "\n"
-    await utils.send_long_message(
-        self, message.channel, output, message.server is not None)
+        await self.send_message(
+            message.channel,
+            embed=_jisho_kanji_info(self, html.fromstring(k_data)))
+    # await utils.send_long_message(
+    #     self, message.channel, output, message.server is not None)
 
 
-def _jisho_kanji_info(tree):
+def _jisho_kanji_info(self, tree):
     details = tree.xpath('//div[@class="kanji details"]')[0]
     character = utils.remove_spaces(
         details.xpath('//h1[@class="character"]')[0].text_content())
@@ -312,8 +319,20 @@ def _jisho_kanji_info(tree):
     parts_div = radicals_divs[1]
     parts = "Parts: " + ", ".join(
         utils.remove_spaces(parts_div.xpath("./dd")[0].text_content(), True))
-    return "**{}** {}\n*{}. {}*\n{}\n{}\n{}".format(
-        character, meanings, strokes, stats, readings, radical, parts)
+    embed = discord.Embed(
+        title=character,
+        url="http://jisho.org/search/" + character + "%23kanji",
+        colour=self.default_server.get_member(self.user.id).colour,
+        description="**{}**\n{}. {}".format(character, strokes, stats),
+        image="")
+    embed.add_field(name="Meanings:", value=meanings, inline=False)
+    embed.add_field(name="Readings:", value=readings, inline=False)
+    embed.add_field(
+        name="Radical/Parts:",
+        value="{}\n{}".format(radical, parts), inline=False)
+    return embed
+    # return "**{}** {}\n*{}. {}*\n{}\n{}\n{}".format(
+    #     character, meanings, strokes, stats, readings, radical, parts)
 
 async def _jisho_sentences(self, limit, query, message, sentence_url=None):
     url = sentence_url or "http://jisho.org/search/" + urllib.parse.quote(
