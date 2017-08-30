@@ -26,7 +26,8 @@ def long_message(output, truncate=False, max_chars=2000,
 
 async def send_long_message(self, channel, message, truncate=False,
                             max_chars=2000):
-    for msg in long_message(message, truncate, max_chars):
+    long_msg = long_message(message, truncate, max_chars)
+    for msg in ([long_msg] if type(long_msg) is str else long_msg):
         await self.send_message(channel, msg)
 
 
