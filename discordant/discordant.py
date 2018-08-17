@@ -87,7 +87,8 @@ class Discordant(discord.Client):
         self.command_char = self.config['commands']['command_char']
         self.controllers = self.config["client"]["controllers"]
         self.mongodb = motor.motor_asyncio.AsyncIOMotorClient(
-            self.config["api-keys"]["mongodb"]).get_default_database()
+            self.config["api-keys"]["mongodb"]["uri"])[
+            self.config["api-keys"]["mongodb"]["db_name"]]
         self.load_aliases()
 
     def load_aliases(self):

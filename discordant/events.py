@@ -199,7 +199,7 @@ async def stats_update(self):
                 "avatar": utils.get_avatar_url(x)}
                for x in server.members]
     if logs:
-        await self.mongodb.logs.insert(
+        await self.mongodb.logs.insert_many(
             sorted(logs, key=lambda x: x["timestamp"]))
     dct = {"channels": "channel_id", "members": "user_id"}
     for name, id_name in dct.items():
@@ -212,7 +212,7 @@ async def stats_update(self):
             if document:
                 del document["_id"]
             if document != obj:
-                await collection.update(query, obj, upsert=True)
+                await collection.update_one(query, {"$set": obj}, upsert=True)
                 locals()[count_name] += 1
     print("Updated stats: {} messages, {} channels, {} users updated.".format(
         len(logs), locals()["channels_updated"], locals()["members_updated"]))

@@ -16,7 +16,10 @@
 			"taekim": "abc",
 			"google": "abc"
 		},
-		"mongodb": "",
+		"mongodb": {
+			"uri": "",
+			"db_name": ""
+		},
 		"discordme": {
 			"bump_id": "<id from /server/bump url>",
 			"login": {
