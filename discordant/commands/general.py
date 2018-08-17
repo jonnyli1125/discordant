@@ -198,7 +198,8 @@ async def _jisho_search(self, args_tuple, message, context):
     except Exception as e:
         await self.send_message(message.channel, "Request failed: " + str(e))
         return
-    results = data["data"][:limit]
+    #results = data["data"][:limit] cant embed multiple
+    results = data["data"][:1]
     if not results:
         await self.send_message(message.channel, "No results found.")
         return
@@ -584,6 +585,46 @@ def _crop_and_shift_img(img):
         _slice = img.crop((left, 0, right, char_width))
         new_img.paste(_slice, (0, char_width * i))
     return new_img
+
+
+@Discordant.register_command("pronounce", ["p", "audio", "a"], arg_func=utils.has_args)
+async def _stroke_order(self, args, message):
+    """!pronounce <word>
+    gives audio pronunciation for a word."""
+    query = args
+    url = "http://jisho.org/api/v1/search/words?keyword=" + \
+          urllib.parse.quote(query, encoding="utf-8")
+    try:
+        with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                data = await response.json()
+    except Exception as e:
+        await self.send_message(message.channel, "Request failed: " + str(e))
+        return
+    data_arr = data["data"]
+    if not data_arr:
+        await self.send_message(message.channel, "No results found.")
+        return
+    japanese = data_arr[0]["japanese"][0]
+    url = "http://assets.languagepod101.com/dictionary/japanese/audiomp3.php?"
+    params = "kana=" + urllib.parse.quote(japanese["reading"], encoding="utf-8")
+    if len(japanese) > 1:
+        params += "&kanji=" + urllib.parse.quote(
+            japanese["word"], encoding="utf-8")
+    url += params
+    try:
+        with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if response.status == 404:
+                    await self.send_message(message.channel,
+                                            query + ": Audio file not found")
+                    return
+                buffer = io.BytesIO(await response.read())
+    except Exception as e:
+        await self.send_message(message.channel, "Request failed: " + str(e))
+        return
+    await self.send_file(
+        message.channel, buffer, filename=query + ".mp3")
 
 
 @Discordant.register_command("showvc", ["hidevc"], context=True)
