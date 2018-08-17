@@ -13,10 +13,10 @@ def _punishment_format(self, server, document):
     if "user" not in document:
         user_id = document["user_id"]
         user = server.get_member(user_id)
-        document["user"] = str(user) if user else user_id
+        document["user"] = user.mention if user else user_id
     if "moderator" not in document:
         moderator = server.get_member(document["moderator_id"])
-        document["moderator"] = str(moderator)
+        document["moderator"] = moderator.mention
     document["date"] = document["date"].strftime("%Y/%m/%d %I:%M %p UTC")
     document["duration"] = "indefinite" \
         if not document["duration"] \
@@ -73,7 +73,8 @@ _mod_cmd_to_action = {"warn": "warning",
                       "mute": "mute",
                       "ban": "ban",
                       "unwarn": "remove warning",
-                      "unmute": "remove mute"}
+                      "unmute": "remove mute",
+                      "unban": "remove ban"}
 
 
 async def _mod_cmd(self, args, message, context):
@@ -240,7 +241,7 @@ async def _ban(self, args, message, context):
         authors = set()
         for channel in context.server.channels:
             if channel in [self.staff_channel, self.testing_channel,
-                           self.log_channel] or \
+                           self.log_channel, self.warning_log_channel] or \
                             channel.type != discord.ChannelType.text:
                 continue
             async for msg in self.logs_from(channel, limit=500):
@@ -274,12 +275,39 @@ async def _ban(self, args, message, context):
     await self.ban(user)
 
 
-#@Discordant.register_command("unban", context=True,
-#                             arg_func=utils.has_args, perm_func=_can_ban)
+@Discordant.register_command("unban", context=True,
+                             arg_func=utils.has_args, perm_func=_can_ban)
 async def _unban(self, args, message, context):
-    """!unban <user>
+    """!unban <user/user id> [reason]
     unbans a user."""
-    pass
+    split = utils.try_shlex(args)
+    user_search = split[0]
+    reason = " ".join(split[1:]) if len(split) > 1 else "No reason given."
+    bans = await self.get_bans(context.server)
+    user = utils.get_user(user_search, bans, message, True)
+    if not user:
+        await self.send_message(message.channel,
+                                "User could not be found, or is not banned.")
+        return
+    collection = self.mongodb.punishments
+    action = "remove ban"
+    orig_action = "ban"
+    if not await utils.is_punished(self, user, orig_action):
+        await self.send_message(
+            message.channel, user.name + " has no active " + orig_action + ".")
+        return
+    document = {
+        "user_id": user.id,
+        "action": action,
+        "moderator_id": message.author.id,
+        "date": datetime.utcnow(),
+        "duration": 0,
+        "reason": reason
+    }
+    await collection.insert(document)
+    await self.send_message(self.log_channel, _punishment_format(
+        self, message.server, document))
+    await self.unban(context.server, user)
 
 
 @Discordant.register_command("bans", context=True, perm_func=_can_ban)

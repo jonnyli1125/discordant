@@ -524,12 +524,12 @@ async def _yourei_search(self, args_tuple, message):
         self, args_tuple, message, "yourei", "http://yourei.jp/")
 
 
-@Discordant.register_command("nyanglish", arg_func=_search_args_context)
-async def _nyanglish_search(self, args_tuple, message):
-    """!nyanglish [limit] <query> [context=bool]
-    searches english example sentences from <http://nyanglish.com>."""
-    await _example_sentence_search(
-        self, args_tuple, message, "nyanglish", "http://nyanglish.com/")
+# @Discordant.register_command("nyanglish", arg_func=_search_args_context)
+#async def _nyanglish_search(self, args_tuple, message):
+#    """!nyanglish [limit] <query> [context=bool]
+#    searches english example sentences from <http://nyanglish.com>."""
+#    await _example_sentence_search(
+#        self, args_tuple, message, "nyanglish", "http://nyanglish.com/")
 
 
 # @Discordant.register_handler(r"http:\/\/(yourei\.jp|nyanglish\.com)\/(\S+)")
