@@ -134,7 +134,7 @@ async def _mod_cmd(self, args, message, context):
         "duration": duration,
         "reason": reason
     }
-    await collection.insert(document)
+    await collection.insert_one(document)
     role = utils.action_to_role(self, action)
     not_warn = action != "warning"
     if role and not_warn:  # hide warning change
@@ -188,7 +188,7 @@ async def _mod_remove_cmd(self, args, message, context):
         "duration": 0,
         "reason": reason
     }
-    await collection.insert(document)
+    await collection.insert_one(document)
     role = utils.action_to_role(self, orig_action)
     not_warn = orig_action != "warning"
     if role and not_warn:  # hide warning change
@@ -268,7 +268,7 @@ async def _ban(self, args, message, context):
         "duration": 0,
         "reason": reason
     }
-    await collection.insert(document)
+    await collection.insert_one(document)
     await self.send_message(
         self.log_channel,
         _punishment_format(self, message.server, document))
@@ -304,7 +304,7 @@ async def _unban(self, args, message, context):
         "duration": 0,
         "reason": reason
     }
-    await collection.insert(document)
+    await collection.insert_one(document)
     await self.send_message(self.log_channel, _punishment_format(
         self, message.server, document))
     await self.unban(context.server, user)
