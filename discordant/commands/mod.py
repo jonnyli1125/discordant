@@ -52,7 +52,7 @@ def _can_ban(self, user):
     return utils.has_permission(user, "ban_members")
 
 
-@Discordant.register_command("modhistory", ["modh"], context=True,
+#@Discordant.register_command("modhistory", ["modh"], context=True,
                              arg_func=utils.has_args, perm_func=_can_kick)
 async def _moderation_history(self, args, message, context):
     """!modhistory <user>
@@ -145,7 +145,7 @@ async def _mod_cmd(self, args, message, context):
     await utils.add_punishment_timer(self, user, action)
 
 
-@Discordant.register_command("warn", context=True,
+#@Discordant.register_command("warn", context=True,
                              arg_func=utils.has_args, perm_func=_can_kick)
 async def _warn(self, args, message, context):
     """!warn <user> [reason] or !warn <user> [duration=hours] [reason=str]
@@ -153,7 +153,7 @@ async def _warn(self, args, message, context):
     await _mod_cmd(self, args, message, context)
 
 
-@Discordant.register_command("mute", context=True,
+#@Discordant.register_command("mute", context=True,
                              arg_func=utils.has_args, perm_func=_can_kick)
 async def _mute(self, args, message, context):
     """!mute <user> [reason] or !mute <user> [duration=hours] [reason=str]
@@ -198,7 +198,7 @@ async def _mod_remove_cmd(self, args, message, context):
         _punishment_format(self, message.server, document))
 
 
-@Discordant.register_command("unwarn", context=True,
+#@Discordant.register_command("unwarn", context=True,
                              arg_func=utils.has_args, perm_func=_can_kick)
 async def _unwarn(self, args, message, context):
     """!unwarn <user> [reason]
@@ -206,7 +206,7 @@ async def _unwarn(self, args, message, context):
     await _mod_remove_cmd(self, args, message, context)
 
 
-@Discordant.register_command("unmute", context=True,
+#@Discordant.register_command("unmute", context=True,
                              arg_func=utils.has_args, perm_func=_can_kick)
 async def _unmute(self, args, message, context):
     """!unmute <user> [reason]
@@ -214,7 +214,7 @@ async def _unmute(self, args, message, context):
     await _mod_remove_cmd(self, args, message, context)
 
 
-@Discordant.register_command("ban", context=True,
+#@Discordant.register_command("ban", context=True,
                              arg_func=utils.has_args, perm_func=_can_ban)
 async def _ban(self, args, message, context):
     """!ban <user/user id> [reason]
@@ -275,7 +275,7 @@ async def _ban(self, args, message, context):
     await self.ban(user)
 
 
-@Discordant.register_command("unban", context=True,
+#@Discordant.register_command("unban", context=True,
                              arg_func=utils.has_args, perm_func=_can_ban)
 async def _unban(self, args, message, context):
     """!unban <user/user id> [reason]
@@ -333,7 +333,7 @@ async def _bans(self, args, message, context):
             "\npage {} out of {}".format(page + 1, pages)))
 
 
-@Discordant.register_command("reason", context=True,
+#@Discordant.register_command("reason", context=True,
                              arg_func=utils.has_args, perm_func=_can_kick)
 async def _reason(self, args, message, context):
     """!reason <user> <reason>
